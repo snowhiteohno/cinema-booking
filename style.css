@@ -1,0 +1,138 @@
+:root {
+  --bg-color: #2B2D42;       
+  --seat-avail: #9BF6FF;     
+  --seat-selected: #FDFFB6;  
+  --seat-occupied: #FFADAD;  
+  --text-color: #EDF2F4;
+  --screen-glow: rgba(255, 255, 255, 0.7);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  margin: 0;
+}
+.movie-container {
+  margin: 20px 0;
+}
+
+.movie-container select {
+  background-color: #fff;
+  border: 0;
+  border-radius: 5px;
+  font-size: 14px;
+  margin-left: 10px;
+  padding: 5px 15px;
+  appearance: none;
+  cursor: pointer;
+}
+
+.showcase {
+  background: rgba(0, 0, 0, 0.2); 
+  padding: 10px 20px;
+  border-radius: 5px;
+  color: #777;
+  list-style-type: none;
+  display: flex;
+  justify-content: space-between;
+  width: 400px; 
+  margin-bottom: 20px;
+}
+
+.showcase li {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 15px;
+}
+
+.showcase li small {
+  margin-left: 10px;
+  color: #ddd;
+}
+
+.seat {
+  background-color: var(--seat-avail);
+  height: 20px;
+  width: 25px;
+  margin: 5px;
+  border-top-left-radius: 12px; 
+  border-top-right-radius: 12px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.seat.selected {
+  background-color: var(--seat-selected);
+  box-shadow: 0 0 10px var(--seat-selected); 
+  transform: scale(1.1);
+}
+
+.seat.occupied {
+  background-color: var(--seat-occupied);
+  opacity: 0.4; 
+  cursor: not-allowed;
+}
+
+.seat:not(.occupied):hover {
+  transform: scale(1.2);
+}
+
+.container {
+  perspective: 1000px; 
+  margin-bottom: 30px;
+}
+
+.screen {
+  background-color: #fff;
+  height: 70px;
+  width: 100%;
+  margin: 15px 0;
+  transform: rotateX(-45deg); 
+  box-shadow: 0 3px 10px var(--screen-glow);
+  border-radius: 8px;
+}
+
+.seat-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.row {
+  display: flex;
+}
+
+p.text {
+  margin: 5px 0;
+}
+
+p.text span {
+  color: var(--seat-avail);
+  font-weight: bold;
+}
+
+#bookBtn {
+  margin-top: 20px;
+  padding: 10px 25px;
+  background-color: var(--seat-avail);
+  border: none;
+  border-radius: 5px;
+  font-weight: bold;
+  cursor: pointer;
+  color: #333;
+}
+
+#bookBtn:hover {
+  background-color: var(--seat-selected);
+}
