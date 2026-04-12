@@ -2,7 +2,6 @@ import tkinter as tk
 from tkinter import font as tkfont
 import threading
 import ctypes
-import ctypes.wintypes
 import re
 
 WDA_EXCLUDEFROMCAPTURE   = 0x00000011
@@ -10,7 +9,7 @@ DWMWA_WINDOW_CORNER_PREF = 33
 DWMWCP_ROUND             = 2
 
 
-# ── Markdown renderer ────────────────────────────────────────────────────────
+# ── Markdown renderer ─────────────────────────────────────────────────────────
 class MarkdownRenderer:
     def __init__(self, text_widget: tk.Text):
         self.widget = text_widget
@@ -18,23 +17,60 @@ class MarkdownRenderer:
 
     def _define_tags(self):
         mono = ('Cascadia Code', 10) if 'Cascadia Code' in tkfont.families() else ('Consolas', 10)
-        self.widget.tag_configure('h1',          font=('Segoe UI', 18, 'bold'), foreground='#ffffff', spacing3=6)
-        self.widget.tag_configure('h2',          font=('Segoe UI', 15, 'bold'), foreground='#e0e0e0', spacing3=4)
+        self.widget.tag_configure('h1',          font=('Segoe UI', 17, 'bold'), foreground='#ffffff', spacing3=5)
+        self.widget.tag_configure('h2',          font=('Segoe UI', 14, 'bold'), foreground='#e2e2e2', spacing3=4)
         self.widget.tag_configure('h3',          font=('Segoe UI', 12, 'bold'), foreground='#c0c0c0', spacing3=3)
         self.widget.tag_configure('bold',        font=('Segoe UI', 11, 'bold'), foreground='#f0f0f0')
         self.widget.tag_configure('italic',      font=('Segoe UI', 11, 'italic'), foreground='#d0d0d0')
-        self.widget.tag_configure('normal',      font=('Segoe UI', 11), foreground='#d0d0d0')
+        self.widget.tag_configure('normal',      font=('Segoe UI', 11), foreground='#c8c8d0')
         self.widget.tag_configure('inline_code', font=mono, foreground='#7dd3a8', background='#1a1a2e')
-        self.widget.tag_configure('code_block',  font=mono, foreground='#a8d8ea', background='#0f0f1a',
-                                  lmargin1=12, lmargin2=12, rmargin=12, spacing1=2, spacing3=2)
-        self.widget.tag_configure('code_lang',   font=(mono[0], 9), foreground='#555577', background='#0f0f1a')
-        self.widget.tag_configure('divider',     font=('Segoe UI', 4), foreground='#2a2a3a')
-        self.widget.tag_configure('bullet',      font=('Segoe UI', 11), foreground='#7c6af7', lmargin1=8, lmargin2=20)
+        self.widget.tag_configure('code_block',  font=mono, foreground='#a8d8ea', background='#0d0d1a',
+                                  lmargin1=10, lmargin2=10, rmargin=10, spacing1=2, spacing3=2)
+        self.widget.tag_configure('code_lang',   font=(mono[0], 9), foreground='#44446a', background='#0d0d1a')
+        self.widget.tag_configure('bullet',      font=('Segoe UI', 11), foreground='#7c6af7', lmargin1=8, lmargin2=22)
+        self.widget.tag_configure('divider',     font=('Segoe UI', 3), foreground='#22223a')
+        # Chat role headers
+        self.widget.tag_configure('ai_header',   font=('Segoe UI', 9, 'bold'), foreground='#7c6af7', spacing1=10, spacing3=4)
+        self.widget.tag_configure('user_header', font=('Segoe UI', 9, 'bold'), foreground='#3a9f6e', spacing1=10, spacing3=4)
+        self.widget.tag_configure('user_text',   font=('Segoe UI', 11), foreground='#a0e8c0', lmargin1=4)
+        self.widget.tag_configure('thinking',    font=('Segoe UI', 10, 'italic'), foreground='#555577')
+        self.widget.tag_configure('sep',         font=('Segoe UI', 3), foreground='#1e1e35')
 
-    def render(self, md: str):
+    def append_ai(self, md: str):
+        """Append an AI markdown response to the chat."""
+        self._ins('✦ AI  ' + '─' * 42 + '\n', 'ai_header')
+        self._render_md(md)
+        self._ins('\n', 'sep')
+
+    def append_user(self, text: str):
+        """Append a user message to the chat."""
+        self._ins('You  ' + '─' * 43 + '\n', 'user_header')
+        self._ins(text + '\n', 'user_text')
+        self._ins('\n', 'sep')
+
+    def show_thinking(self):
+        self.widget.configure(state='normal')
+        self.widget.insert(tk.END, '● thinking...\n', 'thinking')
+        self.widget.configure(state='disabled')
+        self.widget.see(tk.END)
+
+    def hide_thinking(self):
+        """Remove the last thinking indicator line."""
+        self.widget.configure(state='normal')
+        content = self.widget.get('1.0', tk.END)
+        if '● thinking...' in content:
+            start = self.widget.search('● thinking...', '1.0', tk.END)
+            if start:
+                end = f"{start} lineend+1c"
+                self.widget.delete(start, end)
+        self.widget.configure(state='disabled')
+
+    def clear(self):
         self.widget.configure(state='normal')
         self.widget.delete('1.0', tk.END)
+        self.widget.configure(state='disabled')
 
+    def _render_md(self, md: str):
         lines         = md.splitlines()
         i             = 0
         in_code_block = False
@@ -52,8 +88,8 @@ class MarkdownRenderer:
                 else:
                     in_code_block = False
                     if code_lang:
-                        self.widget.insert(tk.END, f' {code_lang}\n', 'code_lang')
-                    self.widget.insert(tk.END, '\n'.join(code_buf) + '\n', 'code_block')
+                        self._ins(f' {code_lang}\n', 'code_lang')
+                    self._ins('\n'.join(code_buf) + '\n', 'code_block')
                     self._ins('\n', 'normal')
                     code_lang = ''
                     code_buf  = []
@@ -65,14 +101,11 @@ class MarkdownRenderer:
                 i += 1
                 continue
 
-            if line.startswith('### '):
-                self._ins(line[4:] + '\n', 'h3')
-            elif line.startswith('## '):
-                self._ins(line[3:] + '\n', 'h2')
-            elif line.startswith('# '):
-                self._ins(line[2:] + '\n', 'h1')
+            if line.startswith('### '):      self._ins(line[4:] + '\n', 'h3')
+            elif line.startswith('## '):     self._ins(line[3:] + '\n', 'h2')
+            elif line.startswith('# '):      self._ins(line[2:] + '\n', 'h1')
             elif line.strip() in ('---', '***', '___'):
-                self._ins('─' * 55 + '\n', 'divider')
+                self._ins('─' * 52 + '\n', 'divider')
             elif re.match(r'^(\*|-|\+) ', line):
                 self._ins('• ', 'bullet')
                 self._inline(line[2:])
@@ -82,15 +115,11 @@ class MarkdownRenderer:
             else:
                 self._inline(line)
                 self._ins('\n', 'normal')
-
             i += 1
-
-        self.widget.configure(state='disabled')
-        self.widget.see('1.0')
 
     def _inline(self, text: str):
         for part in re.split(r'(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)', text):
-            if part.startswith('`') and part.endswith('`'):
+            if part.startswith('`') and part.endswith('`') and len(part) > 2:
                 self._ins(part[1:-1], 'inline_code')
             elif part.startswith('**') and part.endswith('**'):
                 self._ins(part[2:-2], 'bold')
@@ -100,19 +129,24 @@ class MarkdownRenderer:
                 self._ins(part, 'normal')
 
     def _ins(self, text, tag):
+        self.widget.configure(state='normal')
         self.widget.insert(tk.END, text, tag)
+        self.widget.configure(state='disabled')
+        self.widget.see(tk.END)
 
 
-# ── Overlay ──────────────────────────────────────────────────────────────────
+# ── Overlay window ────────────────────────────────────────────────────────────
 class OverlayWindow:
     def __init__(self):
-        self.root     = None
-        self.renderer = None
-        self._ready   = threading.Event()
-        self._drag_x  = 0
-        self._drag_y  = 0
-        self.visible  = False
-        self._hwnd    = None
+        self.root       = None
+        self.renderer   = None
+        self._ready     = threading.Event()
+        self._drag_x    = 0
+        self._drag_y    = 0
+        self.visible    = False
+        self._hwnd      = None
+        self.is_thinking = False
+        self.on_send    = None   # callback set by main.py: fn(text: str)
 
     def start(self):
         t = threading.Thread(target=self._run, daemon=True)
@@ -126,16 +160,8 @@ class OverlayWindow:
         self.root.mainloop()
 
     def _apply_capture_exclusion(self):
-        """
-        Call this every time the window is shown (deiconify).
-        Windows can reset display affinity after window state changes.
-        """
         try:
-            result = ctypes.windll.user32.SetWindowDisplayAffinity(
-                self._hwnd, WDA_EXCLUDEFROMCAPTURE
-            )
-            if not result:
-                print("logs: ⚠️  SetWindowDisplayAffinity failed", flush=True)
+            ctypes.windll.user32.SetWindowDisplayAffinity(self._hwnd, WDA_EXCLUDEFROMCAPTURE)
         except Exception as e:
             print(f"logs: Capture exclusion error: {e}", flush=True)
 
@@ -143,8 +169,8 @@ class OverlayWindow:
         self.root.title("ai-overlay")
         self.root.overrideredirect(True)
         self.root.attributes('-topmost', True)
-        self.root.attributes('-alpha', 0.88)
-        self.root.configure(bg='#12121f')
+        self.root.attributes('-alpha', 0.92)
+        self.root.configure(bg='#0e0e1a')
         self.root.withdraw()
 
         self.root.update()
@@ -160,59 +186,72 @@ class OverlayWindow:
         except Exception:
             pass
 
-        # Apply capture exclusion once at build time
         self._apply_capture_exclusion()
 
-        # ── Layout ──────────────────────────────────────────────────────────
-        outer = tk.Frame(self.root, bg='#2a2a4a', padx=1, pady=1)
+        # ── Border ──────────────────────────────────────────────────────────
+        outer = tk.Frame(self.root, bg='#2a2260', padx=1, pady=1)
         outer.pack(fill='both', expand=True)
 
-        inner = tk.Frame(outer, bg='#12121f', padx=14, pady=10)
+        inner = tk.Frame(outer, bg='#0e0e1a', padx=12, pady=10)
         inner.pack(fill='both', expand=True)
 
-        header = tk.Frame(inner, bg='#12121f')
-        header.pack(fill='x', pady=(0, 8))
+        # ── Header ──────────────────────────────────────────────────────────
+        header = tk.Frame(inner, bg='#0e0e1a')
+        header.pack(fill='x', pady=(0, 6))
 
         tk.Label(
-            header, text="✦  AI",
-            bg='#12121f', fg='#7c6af7',
+            header, text="✦  AI Assistant",
+            bg='#0e0e1a', fg='#7c6af7',
             font=('Segoe UI', 10, 'bold')
         ).pack(side='left')
 
-        tk.Label(
-            header, text="Ctrl+/ to hide",
-            bg='#12121f', fg='#2a2a4a',
-            font=('Segoe UI', 9)
-        ).pack(side='right', padx=(0, 8))
+        # Clear button
+        clear_btn = tk.Label(
+            header, text=" ⟳ Clear ",
+            bg='#0e0e1a', fg='#333360',
+            font=('Segoe UI', 9), cursor='hand2'
+        )
+        clear_btn.pack(side='right', padx=(4, 0))
+        clear_btn.bind('<Button-1>', lambda e: self._clear_chat())
+        clear_btn.bind('<Enter>',    lambda e: clear_btn.config(fg='#f0a050'))
+        clear_btn.bind('<Leave>',    lambda e: clear_btn.config(fg='#333360'))
 
+        # Close button
         close_btn = tk.Label(
             header, text=" ✕ ",
-            bg='#12121f', fg='#333355',
+            bg='#0e0e1a', fg='#333360',
             font=('Segoe UI', 10), cursor='hand2'
         )
         close_btn.pack(side='right')
         close_btn.bind('<Button-1>', lambda e: self.hide())
         close_btn.bind('<Enter>',    lambda e: close_btn.config(fg='#ff5555'))
-        close_btn.bind('<Leave>',    lambda e: close_btn.config(fg='#333355'))
+        close_btn.bind('<Leave>',    lambda e: close_btn.config(fg='#333360'))
 
-        tk.Frame(inner, bg='#1e1e35', height=1).pack(fill='x', pady=(0, 8))
+        tk.Label(
+            header, text="m+n hide  |  k+c clear",
+            bg='#0e0e1a', fg='#222240',
+            font=('Segoe UI', 8)
+        ).pack(side='right', padx=8)
 
-        text_frame = tk.Frame(inner, bg='#12121f')
-        text_frame.pack(fill='both', expand=True)
+        tk.Frame(inner, bg='#1a1a30', height=1).pack(fill='x', pady=(0, 6))
+
+        # ── Chat area ───────────────────────────────────────────────────────
+        chat_frame = tk.Frame(inner, bg='#0e0e1a')
+        chat_frame.pack(fill='both', expand=True)
 
         scrollbar = tk.Scrollbar(
-            text_frame, bg='#1e1e35', troughcolor='#12121f',
-            activebackground='#7c6af7', relief='flat', bd=0, width=5
+            chat_frame, bg='#1a1a30', troughcolor='#0e0e1a',
+            activebackground='#7c6af7', relief='flat', bd=0, width=4
         )
         scrollbar.pack(side='right', fill='y')
 
         self.text_area = tk.Text(
-            text_frame,
-            bg='#12121f', fg='#d0d0d0',
+            chat_frame,
+            bg='#0e0e1a', fg='#c8c8d0',
             font=('Segoe UI', 11),
             wrap=tk.WORD, relief='flat', bd=0,
             cursor='arrow', state='disabled',
-            width=52, height=22,
+            width=52, height=20,
             yscrollcommand=scrollbar.set,
             padx=4, pady=4,
             selectbackground='#2a2a4a',
@@ -222,26 +261,130 @@ class OverlayWindow:
 
         self.renderer = MarkdownRenderer(self.text_area)
 
+        # ── Input area ───────────────────────────────────────────────────────
+        tk.Frame(inner, bg='#1a1a30', height=1).pack(fill='x', pady=(8, 6))
+
+        input_row = tk.Frame(inner, bg='#0e0e1a')
+        input_row.pack(fill='x')
+
+        input_wrap = tk.Frame(input_row, bg='#1a1a35', padx=1, pady=1)
+        input_wrap.pack(side='left', fill='x', expand=True, padx=(0, 8))
+
+        self.input_var = tk.StringVar()
+        self.input_field = tk.Entry(
+            input_wrap,
+            textvariable=self.input_var,
+            bg='#13132a', fg='#e0e0f0',
+            font=('Segoe UI', 11),
+            relief='flat', bd=0,
+            insertbackground='#7c6af7',
+        )
+        self.input_field.pack(fill='x', ipady=7, padx=6)
+        self.input_field.bind('<Return>',       self._on_send)
+        self.input_field.bind('<FocusIn>',      lambda e: self._set_placeholder(False))
+        self.input_field.bind('<FocusOut>',     lambda e: self._set_placeholder(True))
+        self.input_field.bind('<Button-1>',     lambda e: self.root.focus_force())
+        self._set_placeholder(True)
+
+        self.send_btn = tk.Label(
+            input_row, text='  ↵ Send  ',
+            bg='#7c6af7', fg='#ffffff',
+            font=('Segoe UI', 9, 'bold'),
+            cursor='hand2', pady=6
+        )
+        self.send_btn.pack(side='right')
+        self.send_btn.bind('<Button-1>',  self._on_send)
+        self.send_btn.bind('<Enter>',     lambda e: self.send_btn.config(bg='#9b8fff'))
+        self.send_btn.bind('<Leave>',     lambda e: self.send_btn.config(bg='#7c6af7'))
+
+        # ── Position & drag ──────────────────────────────────────────────────
         sw = self.root.winfo_screenwidth()
-        self.root.geometry(f"580x480+{sw - 610}+24")
+        self.root.geometry(f"580x520+{sw - 610}+24")
 
-        for widget in (header,):
-            widget.bind('<Button-1>',  self._drag_start)
-            widget.bind('<B1-Motion>', self._drag_move)
+        header.bind('<Button-1>',  self._drag_start)
+        header.bind('<B1-Motion>', self._drag_move)
 
+    # ── Placeholder ──────────────────────────────────────────────────────────
+    def _set_placeholder(self, show: bool):
+        current = self.input_var.get()
+        placeholder = 'Ask a follow-up question...'
+        if show and (current == '' or current == placeholder):
+            self.input_var.set(placeholder)
+            self.input_field.config(fg='#333360')
+        elif not show and current == placeholder:
+            self.input_var.set('')
+            self.input_field.config(fg='#e0e0f0')
+
+    # ── Send handler ─────────────────────────────────────────────────────────
+    def _on_send(self, event=None):
+        text = self.input_var.get().strip()
+        placeholder = 'Ask a follow-up question...'
+        if not text or text == placeholder or self.is_thinking:
+            return
+        self.input_var.set('')
+        self._set_placeholder(True)
+
+        if self.on_send:
+            threading.Thread(target=self.on_send, args=(text,), daemon=True).start()
+
+    # ── Clear chat ────────────────────────────────────────────────────────────
+    def _clear_chat(self):
+        self.renderer.clear()
+        if self.on_send:
+            # Signal main.py to also clear its conversation history
+            threading.Thread(
+                target=lambda: None if not hasattr(self, 'on_clear') else self.on_clear(),
+                daemon=True
+            ).start()
+        if hasattr(self, 'on_clear') and self.on_clear:
+            threading.Thread(target=self.on_clear, daemon=True).start()
+        print("🗑️   Chat cleared.", flush=True)
+
+    # ── Public API ────────────────────────────────────────────────────────────
     def show(self, md_text: str = None):
         if not self.root:
             return
         def _update():
             if md_text is not None:
-                self.renderer.render(md_text)
+                self.renderer.append_ai(md_text)
             self.root.deiconify()
             self.root.lift()
             self.root.update()
-            # Re-apply every time we show — Windows may reset it after deiconify
             self._apply_capture_exclusion()
             self.visible = True
         self.root.after(0, _update)
+
+    def add_user_message(self, text: str):
+        if not self.root:
+            return
+        self.root.after(0, lambda: self.renderer.append_user(text))
+
+    def add_ai_message(self, md_text: str):
+        if not self.root:
+            return
+        def _update():
+            self.renderer.hide_thinking()
+            self.renderer.append_ai(md_text)
+            self.is_thinking = False
+            self.send_btn.config(bg='#7c6af7', text='  ↵ Send  ')
+        self.root.after(0, _update)
+
+    def set_thinking(self, state: bool):
+        if not self.root:
+            return
+        def _update():
+            self.is_thinking = state
+            if state:
+                self.renderer.show_thinking()
+                self.send_btn.config(bg='#333360', text='  ● Wait  ')
+            else:
+                self.send_btn.config(bg='#7c6af7', text='  ↵ Send  ')
+        self.root.after(0, _update)
+
+    def clear_chat(self):
+        if not self.root:
+            return
+        self.root.after(0, self.renderer.clear)
 
     def hide(self):
         if not self.root:
