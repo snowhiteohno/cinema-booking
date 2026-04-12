@@ -52,6 +52,35 @@ KEY_ADD    = ','
 KEY_SEND   = '.'
 KEY_CLEAR  = '/'
 
+# ── Pause control ────────────────────────────────────────────────────────────
+is_typing  = False    # True only while type_answer() is running
+is_paused  = False    # True when user pressed Esc to pause
+pause_event = threading.Event()
+pause_event.set()     # start in "not paused" state (set = allowed to proceed)
+
+
+def pause_typing():
+    global is_paused
+    is_paused = True
+    pause_event.clear()   # block the typing loop
+    print("⏸️   Typing paused. Press Esc again to resume.", flush=True)
+
+
+def resume_typing():
+    global is_paused
+    is_paused = False
+    pause_event.set()     # unblock the typing loop
+    print("▶️   Typing resumed.", flush=True)
+
+
+def toggle_pause():
+    if not is_typing:
+        return            # Esc does nothing if we're not currently typing
+    if is_paused:
+        resume_typing()
+    else:
+        pause_typing()
+
 
 # ── Screenshot ───────────────────────────────────────────────────────────────
 def take_screenshot() -> Image.Image:
@@ -88,13 +117,11 @@ def strip_comments(code: str) -> str:
 
 
 def normalize_indentation(code: str) -> str:
-    """Convert tabs to 4 spaces and fix any over-indented lines."""
     lines = []
     for line in code.splitlines():
         line = line.replace('\t', '    ')
-        # Count leading spaces and round to nearest multiple of 4
-        stripped   = line.lstrip(' ')
-        raw_spaces = len(line) - len(stripped)
+        stripped     = line.lstrip(' ')
+        raw_spaces   = len(line) - len(stripped)
         indent_level = round(raw_spaces / 4)
         lines.append('    ' * indent_level + stripped)
     return "\n".join(lines)
@@ -121,14 +148,12 @@ def human_delay():
     time.sleep(random.uniform(TYPE_DELAY_MIN, TYPE_DELAY_MAX))
 
 
+def wait_if_paused():
+    """Called before every keystroke — blocks here if paused."""
+    pause_event.wait()
+
+
 def clear_auto_indent():
-    """
-    After pressing Enter the editor auto-indents the new line.
-    This wipes whatever it inserted so we can type our own clean indentation.
-    Home  → go to start of line
-    Shift+End → select to end of line
-    Delete → remove the selection
-    """
     kb.press(Key.home);  kb.release(Key.home)
     time.sleep(0.03)
     kb.press(Key.shift)
@@ -140,27 +165,30 @@ def clear_auto_indent():
 
 
 def type_answer(answer: str):
-    lines = answer.splitlines()
+    global is_typing
+    is_typing = True
 
+    lines = answer.splitlines()
     for i, line in enumerate(lines):
-        # Type every character on this line (including leading spaces)
         for char in line:
+            wait_if_paused()       # ← pauses here if Esc was pressed
             kb.type(char)
             human_delay()
 
         if i < len(lines) - 1:
-            # Press Enter to go to the next line
+            wait_if_paused()
             kb.press(Key.enter)
             kb.release(Key.enter)
             time.sleep(0.05)
-
-            # Wipe the editor's auto-indent so our spaces don't stack
             clear_auto_indent()
+
+    is_typing = False
 
 
 def deliver_answer(answer: str):
     if AUTO_TYPE:
         print(f"⌨️   Typing starts in {STARTUP_DELAY}s — click into the answer field now!", flush=True)
+        print(f"    Press Esc to pause / resume anytime.", flush=True)
         time.sleep(STARTUP_DELAY)
         type_answer(answer)
         print("✅  Done typing!\n", flush=True)
@@ -226,6 +254,11 @@ def get_char(key) -> str | None:
 
 
 def on_press(key):
+    # Esc toggles pause — checked first before anything else
+    if key == Key.esc:
+        toggle_pause()
+        return
+
     pressed_keys.add(key)
     chars = {get_char(k) for k in pressed_keys}
 
@@ -255,7 +288,8 @@ if __name__ == "__main__":
     print(f"    Mode   : {mode}")
     print(f"    k + ,  →  Add screenshot to queue")
     print(f"    k + .  →  Send all screenshots to Gemini")
-    print(f"    k + /  →  Clear the queue\n")
+    print(f"    k + /  →  Clear the queue")
+    print(f"    Esc    →  Pause / Resume typing\n")
 
     with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
         listener.join()
