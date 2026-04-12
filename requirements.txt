@@ -4,3 +4,7 @@ pynput
 mss
 Pillow
 pyperclip
+sounddevice
+pyaudiowpatch
+numpy
+scipy
