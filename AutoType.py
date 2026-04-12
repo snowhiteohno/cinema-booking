@@ -21,9 +21,9 @@ if not GEMINI_API_KEY:
     sys.exit(1)
 
 GEMINI_MODELS = [
-    "gemini-2.5-flash",       # primary
-    "gemini-2.5-pro",  # fallback 1
-    "gemini-2.5-flash-lite",       # fallback 2
+    "gemini-2.5-flash",
+    "gemini-2.5-pro",
+    "gemini-2.5-flash-lite",
 ]
 
 AUTO_TYPE      = True
@@ -56,19 +56,22 @@ KEY_ANCHOR = 'k'
 KEY_ADD    = ','
 KEY_SEND   = '.'
 KEY_CLEAR  = '/'
+KEY_STOP   = 'x'   # k + x → stop typing immediately
 
-# ── Pause control ────────────────────────────────────────────────────────────
+# ── Typing state ─────────────────────────────────────────────────────────────
 is_typing   = False
 is_paused   = False
+is_stopped  = False   # when True, type_answer() exits at next character
+
 pause_event = threading.Event()
-pause_event.set()
+pause_event.set()     # set = not paused = allowed to proceed
 
 
 def pause_typing():
     global is_paused
     is_paused = True
     pause_event.clear()
-    print("⏸️   Typing paused. Press Esc again to resume.", flush=True)
+    print("⏸️   Typing paused. Press Esc to resume, k+x to stop.", flush=True)
 
 
 def resume_typing():
@@ -76,6 +79,19 @@ def resume_typing():
     is_paused = False
     pause_event.set()
     print("▶️   Typing resumed.", flush=True)
+
+
+def stop_typing():
+    """
+    Immediately abort typing at the next character boundary.
+    Also unblocks any pause so the thread can actually exit.
+    """
+    global is_stopped
+    if not is_typing:
+        return
+    is_stopped = True
+    pause_event.set()   # unblock if currently paused so the loop can check is_stopped
+    print("⛔  Typing stopped. Program ready for new commands.", flush=True)
 
 
 def toggle_pause():
@@ -141,7 +157,7 @@ def clean_response(raw: str) -> str:
 
 # ── Gemini with fallback ──────────────────────────────────────────────────────
 def query_gemini(images: list[Image.Image]) -> str:
-    contents = [PROMPT] + images
+    contents   = [PROMPT] + images
     last_error = None
 
     for model in GEMINI_MODELS:
@@ -162,8 +178,12 @@ def human_delay():
     time.sleep(random.uniform(TYPE_DELAY_MIN, TYPE_DELAY_MAX))
 
 
-def wait_if_paused():
-    pause_event.wait()
+def wait_if_paused() -> bool:
+    """
+    Blocks if paused. Returns True if typing should continue, False if stopped.
+    """
+    pause_event.wait()   # blocks here when paused; immediately passes when not
+    return not is_stopped
 
 
 def clear_auto_indent():
@@ -178,18 +198,24 @@ def clear_auto_indent():
 
 
 def type_answer(answer: str):
-    global is_typing
-    is_typing = True
+    global is_typing, is_stopped
+
+    is_typing  = True
+    is_stopped = False        # reset stop flag for this new typing session
 
     lines = answer.splitlines()
     for i, line in enumerate(lines):
         for char in line:
-            wait_if_paused()
+            if not wait_if_paused():   # returns False if k+x was pressed
+                is_typing = False
+                return               # exit immediately — program is free again
             kb.type(char)
             human_delay()
 
         if i < len(lines) - 1:
-            wait_if_paused()
+            if not wait_if_paused():
+                is_typing = False
+                return
             kb.press(Key.enter)
             kb.release(Key.enter)
             time.sleep(0.05)
@@ -201,10 +227,11 @@ def type_answer(answer: str):
 def deliver_answer(answer: str):
     if AUTO_TYPE:
         print(f"⌨️   Typing starts in {STARTUP_DELAY}s — click into the answer field now!", flush=True)
-        print(f"    Press Esc to pause / resume anytime.", flush=True)
+        print(f"    Esc → pause/resume  |  k+x → stop completely", flush=True)
         time.sleep(STARTUP_DELAY)
         type_answer(answer)
-        print("✅  Done typing!\n", flush=True)
+        if not is_stopped:
+            print("✅  Done typing!\n", flush=True)
     else:
         pyperclip.copy(answer)
         print("✅  Code copied to clipboard!\n", flush=True)
@@ -275,13 +302,16 @@ def on_press(key):
     chars = {get_char(k) for k in pressed_keys}
 
     if KEY_ANCHOR in chars:
-        if KEY_ADD in chars:
+        if KEY_STOP in chars:              # k + x → stop typing
+            pressed_keys.clear()
+            stop_typing()
+        elif KEY_ADD in chars:             # k + , → add screenshot
             pressed_keys.clear()
             add_to_queue()
-        elif KEY_SEND in chars:
+        elif KEY_SEND in chars:            # k + . → send to Gemini
             pressed_keys.clear()
             send_queue()
-        elif KEY_CLEAR in chars:
+        elif KEY_CLEAR in chars:           # k + / → clear queue
             pressed_keys.clear()
             clear_queue()
 
@@ -302,7 +332,8 @@ if __name__ == "__main__":
     print(f"    k + ,  →  Add screenshot to queue")
     print(f"    k + .  →  Send all screenshots to Gemini")
     print(f"    k + /  →  Clear the queue")
-    print(f"    Esc    →  Pause / Resume typing\n")
+    print(f"    Esc    →  Pause / Resume typing")
+    print(f"    k + x  →  Stop typing immediately\n")
 
     with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
         listener.join()
