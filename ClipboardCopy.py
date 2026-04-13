@@ -28,6 +28,8 @@ PROMPT = (
     "Respond with ONLY the code solution — no explanations, no markdown fences (no ```), "
     "no comments unless they are absolutely essential, and no preamble. "
     "Just raw, clean, working code that can be pasted directly into an editor."
+    "If the question is not related to coding, answer it normally."
+    "Identy the language and provide the code in that language."
 )
 # ────────────────────────────────────────────────────────────────────────────
 
