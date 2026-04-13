@@ -37,71 +37,37 @@ class MCQOverlay:
         self.root.title("mcq")
         self.root.overrideredirect(True)
         self.root.attributes('-topmost', True)
-        self.root.attributes('-alpha', 0.25)
-        self.root.configure(bg='#0a0a14')
+        self.root.attributes('-alpha', 1.0)
+        # Use a specific color for transparency key
+        self.root.attributes('-transparentcolor', '#000001')
+        self.root.configure(bg='#000001')
         self.root.withdraw()
         self.visible = False
 
         self.root.update()
         self._hwnd = ctypes.windll.user32.GetParent(self.root.winfo_id())
 
-        # Rounded corners (Windows 11)
-        try:
-            val = ctypes.c_int(DWMWCP_ROUND)
-            ctypes.windll.dwmapi.DwmSetWindowAttribute(
-                self._hwnd, DWMWA_WINDOW_CORNER_PREF,
-                ctypes.byref(val), ctypes.sizeof(val)
-            )
-        except Exception:
-            pass
-
         self._apply_capture_exclusion()
-
-        # ── Border ──────────────────────────────────────────────────────────
-        outer = tk.Frame(self.root, bg='#2a2260', padx=1, pady=1)
-        outer.pack(fill='both', expand=True)
-
-        inner = tk.Frame(outer, bg='#0a0a14', padx=6, pady=4)
-        inner.pack(fill='both', expand=True)
-
-        # ── Header ──────────────────────────────────────────────────────────
-        header = tk.Frame(inner, bg='#0a0a14')
-        header.pack(fill='x', pady=(0, 2))
-
-        tk.Label(
-            header, text="◈ MCQ",
-            bg='#0a0a14', fg='#7c6af7',
-            font=('Segoe UI', 7, 'bold')
-        ).pack(side='left')
-
-        self.status_label = tk.Label(
-            header, text="",
-            bg='#0a0a14', fg='#333355',
-            font=('Segoe UI', 6)
-        )
-        self.status_label.pack(side='right')
-
-        tk.Frame(inner, bg='#1a1a30', height=1).pack(fill='x', pady=(0, 4))
 
         # ── Answer display ───────────────────────────────────────────────────
         self.answer_var = tk.StringVar(value="—")
         self.answer_label = tk.Label(
-            inner,
+            self.root,
             textvariable=self.answer_var,
-            bg='#0a0a14', fg='#00ff88',
+            bg='#000001', fg='#00ff88',
             font=('Segoe UI', 14, 'bold'),
             anchor='center'
         )
-        self.answer_label.pack(fill='x', pady=(0, 0))
+        self.answer_label.pack(fill='both', expand=True)
 
         sw = self.root.winfo_screenwidth()
         sh = self.root.winfo_screenheight()
-        # Position in bottom-right corner, 100x64 size
-        self.root.geometry(f"100x64+{sw - 110}+{sh - 110}")
+        # Compact geometry for just the answer
+        self.root.geometry(f"80x40+{sw - 110}+{sh - 110}")
 
-        # Drag on header
-        header.bind('<Button-1>',  self._drag_start)
-        header.bind('<B1-Motion>', self._drag_move)
+        # Drag on label
+        self.answer_label.bind('<Button-1>',  self._drag_start)
+        self.answer_label.bind('<B1-Motion>', self._drag_move)
 
     # ── Public API ────────────────────────────────────────────────────────────
     def set_thinking(self):
@@ -110,7 +76,6 @@ class MCQOverlay:
         def _u():
             self.answer_var.set("...")
             self.answer_label.config(fg='#555577')
-            self.status_label.config(text="thinking")
         self.root.after(0, _u)
 
     def set_answer(self, answer: str):
@@ -119,7 +84,6 @@ class MCQOverlay:
         def _u():
             self.answer_var.set(answer)
             self.answer_label.config(fg='#00ff88')
-            self.status_label.config(text="")
         self.root.after(0, _u)
 
     def set_error(self):
@@ -128,7 +92,6 @@ class MCQOverlay:
         def _u():
             self.answer_var.set("✕")
             self.answer_label.config(fg='#ff5555')
-            self.status_label.config(text="error")
         self.root.after(0, _u)
 
     def show(self):
