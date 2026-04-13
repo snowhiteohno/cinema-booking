@@ -1,48 +1,39 @@
-# Screenshot-AI — All Versions
+# Screenshot-AI — Multi-Version Toolkit
 
-A background service that captures your screen, sends it to Gemini, and delivers the answer in different ways depending on the version.
+A background service that captures your screen, sends it to Gemini, and delivers answers via clipboard, automated typing, or floating overlays. Perfect for coding, conceptual questions, MCQs, and interview preparation.
 
 ---
 
-## Setup (same across all versions)
+## 🛠️ Setup (all versions)
 
 ### 1. Install dependencies
-
 ```bash
-pip install google-genai pynput mss Pillow pyperclip python-dotenv
+pip install google-genai pynput mss Pillow pyperclip python-dotenv sounddevice pyaudiowpatch numpy scipy
 ```
+*Note: `pyaudiowpatch` and `sounddevice` are required for the "Full Control" audio features.*
 
-### 2. Create a `.env` file in the project folder
-
-```
+### 2. Configure Environment
+Create a `.env` file in the root project folder:
+```text
 GEMINI_API_KEY=your-key-here
 ```
+Get a free key at [Google AI Studio](https://aistudio.google.com/app/apikey).
 
-Get a free key at https://aistudio.google.com/app/apikey
-
-### 3. Run using the watcher (auto-restarts on file save)
-
+### 3. Run
+You can run the watcher (restarts on save):
 ```bash
 python run.py
 ```
-
-Or run directly:
-
-```bash
-python main.py
-```
+Or run a specific version directly (e.g., `python AutoType.py`).
 
 ---
 
-## Version 1 — Clipboard
+## 📋 Version 1 — Clipboard
+**File:** `ClipboardCopy.py`
 
-**File:** `v1_clipboard/main.py`
-
-Takes the screenshot, sends it to Gemini, and copies the response directly to your clipboard. You then paste it manually wherever you need.
-
-- No extra setup needed
-- Works on Windows, macOS, Linux
-- Best for: any situation where `Ctrl+V` is allowed
+Captures screenshots and copies the AI-generated code directly to your clipboard.
+- **Goal:** Fastest way to get code snippets for pasting.
+- **Multi-Model Fallback:** Automatically tries Flash → Pro → Flash Lite if one fails.
 
 | Hotkey  | Action                                |
 | ------- | ------------------------------------- |
@@ -52,97 +43,89 @@ Takes the screenshot, sends it to Gemini, and copies the response directly to yo
 
 ---
 
-## Version 2 — Auto-Type
+## ⌨️ Version 2 — Auto-Type
+**File:** `AutoType.py`
 
-**File:** `v2_autotype/main.py`
-
-After getting the response from Gemini, automatically types it into whatever field you have focused — character by character with random human-like delays so it looks like natural typing.
-
-- Bypasses sites that block `Ctrl+V` paste
-- 2 second window after Gemini responds to click into the target field
-- Press `Esc` at any point to pause typing — press `Esc` again to resume from exactly where it stopped
-- Works on Windows, macOS, Linux
-- Best for: paste-blocked coding platforms (HackerRank, etc.)
+Simulates human-like typing to enter code character-by-character.
+- **Bypasses:** Sites that block `Ctrl+V` (e.g., HackerRank, LeetCode).
+- **Multi-Model Fallback:** Automatically tries Flash → Pro → Flash Lite if one fails.
+- **Smart Formatting:** Normalizes indentation to 4 spaces and removes comments/markdown.
 
 | Hotkey  | Action                                |
 | ------- | ------------------------------------- |
-| `k + ,` | Add current screenshot to queue       |
-| `k + .` | Send all queued screenshots to Gemini |
-| `k + /` | Clear the queue                       |
-| `Esc`   | Pause / Resume typing                 |
-
-**Key settings at top of file:**
-
-| Setting          | Default | What it does                    |
-| ---------------- | ------- | ------------------------------- |
-| `STARTUP_DELAY`  | `2`     | Seconds before typing starts    |
-| `TYPE_DELAY_MIN` | `0.10`  | Fastest keystroke gap (seconds) |
-| `TYPE_DELAY_MAX` | `0.25`  | Slowest keystroke gap (seconds) |
+| `k + ,` | Add screenshot to queue               |
+| `k + .` | Start processing queue                |
+| `k + /` | Clear queue                           |
+| `a + s` | **Pause / Resume** typing             |
+| `k + x` | **Abort** typing immediately          |
 
 ---
 
-## Version 3 — General Purpose
+## 🧠 Version 3 — General Purpose
+**File:** `general.py`
 
-**File:** `v3_general/main.py`
-
-Same clipboard output as Version 1 but with a smarter prompt that adapts to any type of question on screen.
-
-| Question type    | What Gemini returns              |
-| ---------------- | -------------------------------- |
-| Coding problem   | Working code only                |
-| MCQ              | Correct option + one-line reason |
-| Theory / concept | Clear concise answer             |
-| Math             | Solution with steps              |
-| Anything else    | Most helpful concise answer      |
-
-- No extra setup needed
-- Works on Windows, macOS, Linux
-- Best for: general daily use across different question types
-
-| Hotkey  | Action                                |
-| ------- | ------------------------------------- |
-| `k + ,` | Add current screenshot to queue       |
-| `k + .` | Send all queued screenshots to Gemini |
-| `k + /` | Clear the queue                       |
+An adaptive version that detects the question type and responds accordingly.
+- **Multi-Model Fallback:** Automatically tries Flash → Pro → Flash Lite if one fails.
+- **Coding:** Returns raw executable code.
+- **MCQ:** Returns correct option + brief reason.
+- **Theory:** Concise summary.
+- **Math:** Step-by-step solution.
 
 ---
 
-## Version 4 — Overlay
+## 🎯 Version 4 — MCQ Optimized
+**File:** `mcq/main.py`
 
-**Files:** `v4_overlay/main.py` + `v4_overlay/overlay.py`
+Specialized for Multiple Choice Questions with a tiny, persistent overlay.
+- **Invisible:** Overlay is hidden from screenshots and screen sharing.
+- **Single-Char:** Returns only the correct option (A, B, C, D) for maximum speed.
+- **Multi-Model Fallback:** Automatically tries Flash → Pro → Flash Lite if one fails.
 
-Displays the AI response in a floating transparent window on your screen that is completely invisible to screenshots and screen sharing tools. Only visible on your physical monitor. Responses are rendered as formatted Markdown — headings, bold, inline code, and code blocks all display correctly.
-
-- Scrollable — handles long responses fine
-- Draggable — click and drag the header to reposition
-- Markdown rendering — headings, bold, code blocks displayed properly
-- **Windows 10 v2004 (May 2020) or later required**
-- Best for: when you are screen sharing or being proctored
-
-| Hotkey     | Action                                       |
-| ---------- | -------------------------------------------- |
-| `k + ,`    | Add current screenshot to queue              |
-| `k + .`    | Send to Gemini → response appears in overlay |
-| `k + /`    | Clear the queue                              |
-| `k + t`    | Show dummy test content (for UI testing)     |
-| `m + n`    | Toggle overlay — hide it or bring it back    |
-| `✕ button` | Close the overlay                            |
-
-**How the invisibility works:**
-Uses the native Windows API `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)` which tells the GPU compositor to exclude the window from all capture pipelines. Invisible to PrintScreen, Snipping Tool, Zoom, Google Meet, Microsoft Teams, and OBS. The affinity is re-applied every time the overlay is shown to prevent Windows from resetting it.
+| Hotkey  | Action                                   |
+| ------- | ---------------------------------------- |
+| `k + ,` | Add MCQ screenshot                       |
+| `k + .` | Send to Gemini → Update overlay answer   |
+| `m + n` | Toggle overlay visibility (Hide / Show)  |
 
 ---
 
-## Quick Comparison
+## 👑 Version 5 — Full Control / Interviewer Mode
+**File:** `full Control/main.py`
 
-|                              | v1 Clipboard | v2 Auto-Type     | v3 General | v4 Overlay      |
-| ---------------------------- | ------------ | ---------------- | ---------- | --------------- |
-| Output method                | Clipboard    | Simulated typing | Clipboard  | Floating window |
-| Works on paste-blocked sites | ❌           | ✅               | ❌         | ✅ (read only)  |
-| Invisible to screen share    | ❌           | ✅               | ❌         | ✅              |
-| Pause / resume output        | ❌           | ✅ (Esc key)     | ❌         | ❌              |
-| Toggle visibility            | ❌           | ❌               | ❌         | ✅ (m + n)      |
-| Markdown rendering           | ❌           | ❌               | ❌         | ✅              |
-| Scrollable output            | ❌           | ❌               | ❌         | ✅              |
-| Extra files needed           | None         | None             | None       | `overlay.py`    |
-| OS support                   | Any          | Any              | Any        | Windows only    |
+The most advanced version, featuring a floating Markdown overlay, conversation memory, and audio capabilities.
+- **Interactive:** Follow-up on previous questions via built-in chat UI.
+- **Conversation Memory:** Remembers the last 10 turns for context.
+- **Multi-Model Fallback:** Automatically tries Flash → Pro → Flash Lite for screenshots, follow-ups, AND audio transcription.
+- **Audio (Mic):** Hold the microphone button to record your voice; release to transcribe and ask Gemini.
+- **Interviewer Mode:** Listen to system audio (Transcribes what you hear, e.g., an interviewer speaking) and automatically suggests answers.
+
+| Hotkey  | Action                                       |
+| ------- | -------------------------------------------- |
+| `k + ,` | Add screenshot to context                    |
+| `k + .` | Send context to Gemini                       |
+| `k + c` | **Clear Memory** and Chat history            |
+| `k + t` | Display test content (Verify UI)             |
+| `m + n` | Toggle overlay visibility                    |
+| 🎤 Button| Hold to Record / Release to Send             |
+| 🔊 Button| Toggle System Audio (Interviewer) Listener   |
+
+---
+
+## 📊 Quick Comparison
+
+| Feature                      | Clipboard | Auto-Type | General | MCQ | Full Control |
+| ---------------------------- | --------- | --------- | ------- | --- | ------------ |
+| Output Method                | Clipboard | Typing    | Typing  | Overlay | Overlay      |
+| Invisible to Screenshots     | ❌         | ✅         | ❌       | ✅   | ✅            |
+| Multi-Model Fallback         | ✅         | ✅         | ✅       | ✅   | ✅            |
+| Follow-up Questions          | ❌         | ❌         | ❌       | ❌   | ✅            |
+| Audio / Voice Input          | ❌         | ❌         | ❌       | ❌   | ✅            |
+| System Audio Listen          | ❌         | ❌         | ❌       | ❌   | ✅ (Interviewer) |
+| Markdown Rendering           | ❌         | ❌         | ❌       | ❌   | ✅            |
+| Best For                     | Quick Copy| Paste Blocked| Any     | Exams| Interviews    |
+
+---
+
+## ⚠️ Disclaimer
+This tool is for educational and accessibility purposes only. Please adhere to the academic integrity policies of your institution or organization.
+

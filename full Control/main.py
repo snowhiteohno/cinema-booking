@@ -20,7 +20,11 @@ if not GEMINI_API_KEY:
     print("⚠️  CRITICAL: GEMINI_API_KEY not found.")
     sys.exit(1)
 
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODELS = [
+    "gemini-2.5-flash",
+    "gemini-2.5-pro",
+    "gemini-2.5-flash-lite",
+]
 MAX_TURNS    = 10   # max conversation turns kept in memory (each turn = 1 user + 1 model)
 
 SYSTEM_PROMPT = (
@@ -39,8 +43,8 @@ SYSTEM_PROMPT = (
 
 client  = genai.Client(api_key=GEMINI_API_KEY)
 overlay = OverlayWindow()
-mic     = MicRecorder(client, GEMINI_MODEL)
-sysaudio = SystemAudioListener(client, GEMINI_MODEL, on_transcript=None)   # callback set below
+mic     = MicRecorder(client, GEMINI_MODELS)
+sysaudio = SystemAudioListener(client, GEMINI_MODELS, on_transcript=None)   # callback set below
 
 screenshot_queue: list[Image.Image] = []
 queue_lock   = threading.Lock()
@@ -94,7 +98,7 @@ def image_to_part(img: Image.Image) -> types.Part:
     return types.Part(inline_data=types.Blob(mime_type="image/png", data=buf.getvalue()))
 
 
-# ── Gemini calls ─────────────────────────────────────────────────────────────
+# ── Gemini calls with fallback ────────────────────────────────────────────────
 def query_gemini_screenshot(images: list[Image.Image]) -> str:
     parts = [types.Part(text=SYSTEM_PROMPT)] + [image_to_part(i) for i in images]
     user_turn = types.Content(role="user", parts=parts)
@@ -104,13 +108,24 @@ def query_gemini_screenshot(images: list[Image.Image]) -> str:
         conversation_history.append({"role": "user", "parts": parts})
 
     print(f"logs: Sending {len(images)} screenshot(s) to Gemini...", flush=True)
-    response = client.models.generate_content(model=GEMINI_MODEL, contents=[user_turn])
-    answer   = response.text.strip()
+    last_error = None
 
-    with history_lock:
-        conversation_history.append({"role": "model", "parts": [types.Part(text=answer)]})
+    for model in GEMINI_MODELS:
+        try:
+            print(f"logs: Trying model {model}...", flush=True)
+            response = client.models.generate_content(model=model, contents=[user_turn])
+            answer = response.text.strip()
+            print(f"logs: ✅ Response from {model}", flush=True)
 
-    return answer
+            with history_lock:
+                conversation_history.append({"role": "model", "parts": [types.Part(text=answer)]})
+            
+            return answer
+        except Exception as e:
+            print(f"logs: ⚠️  {model} failed — {e}", flush=True)
+            last_error = e
+
+    raise RuntimeError(f"All models failed for screenshot. Last error: {last_error}")
 
 
 def query_gemini_followup(text: str) -> str:
@@ -125,14 +140,25 @@ def query_gemini_followup(text: str) -> str:
 
     turns = len(contents)
     print(f"logs: Follow-up → Gemini (history: {turns} turns)...", flush=True)
-    response = client.models.generate_content(model=GEMINI_MODEL, contents=contents)
-    answer   = response.text.strip()
+    last_error = None
 
-    with history_lock:
-        conversation_history.append({"role": "model", "parts": [types.Part(text=answer)]})
+    for model in GEMINI_MODELS:
+        try:
+            print(f"logs: Trying model {model} for follow-up...", flush=True)
+            response = client.models.generate_content(model=model, contents=contents)
+            answer = response.text.strip()
+            print(f"logs: ✅ Response from {model}", flush=True)
 
-    _trim_history()
-    return answer
+            with history_lock:
+                conversation_history.append({"role": "model", "parts": [types.Part(text=answer)]})
+
+            _trim_history()
+            return answer
+        except Exception as e:
+            print(f"logs: ⚠️  {model} failed — {e}", flush=True)
+            last_error = e
+
+    raise RuntimeError(f"All models failed for follow-up. Last error: {last_error}")
 
 
 # ── Follow-up handler ─────────────────────────────────────────────────────────

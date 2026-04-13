@@ -16,7 +16,11 @@ if not GEMINI_API_KEY:
     print("⚠️  CRITICAL: GEMINI_API_KEY not found. Please set it in your .env file.")
     sys.exit(1)
 
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODELS = [
+    "gemini-2.5-flash",
+    "gemini-2.5-pro",
+    "gemini-2.5-flash-lite",
+]
 
 PROMPT = (
     "You are a coding assistant. The screenshots contain a coding problem or question. "
@@ -59,13 +63,22 @@ def strip_code_fences(text: str) -> str:
     return "\n".join(lines).strip()
 
 
-# ── Gemini call ──────────────────────────────────────────────────────────────
+# ── Gemini call with fallback ────────────────────────────────────────────────
 def query_gemini(images: list[Image.Image]) -> str:
     contents = [PROMPT] + images
-    print(f"logs: Sending {len(images)} screenshot(s) to Gemini...", flush=True)
-    response = client.models.generate_content(model=GEMINI_MODEL, contents=contents)
-    print("logs: Response received.", flush=True)
-    return strip_code_fences(response.text.strip())
+    last_error = None
+
+    for model in GEMINI_MODELS:
+        try:
+            print(f"logs: Trying model {model}...", flush=True)
+            response = client.models.generate_content(model=model, contents=contents)
+            print(f"logs: ✅ Response from {model}", flush=True)
+            return strip_code_fences(response.text.strip())
+        except Exception as e:
+            print(f"logs: ⚠️  {model} failed — {e}", flush=True)
+            last_error = e
+
+    raise RuntimeError(f"All models failed. Last error: {last_error}")
 
 
 # ── Hotkey actions ───────────────────────────────────────────────────────────

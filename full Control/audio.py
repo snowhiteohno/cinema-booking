@@ -26,9 +26,9 @@ class MicRecorder:
     Call start() to begin recording, stop() to finish and get transcription.
     """
 
-    def __init__(self, gemini_client: genai.Client, model: str):
+    def __init__(self, gemini_client: genai.Client, models: list[str]):
         self.client   = gemini_client
-        self.model    = model
+        self.models   = models
         self._frames  = []
         self._stream  = None
         self._lock    = threading.Lock()
@@ -72,26 +72,33 @@ class MicRecorder:
         return self._transcribe(audio_data)
 
     def _transcribe(self, audio_data: np.ndarray) -> str | None:
-        try:
-            wav_bytes = self._to_wav(audio_data)
-            response  = self.client.models.generate_content(
-                model=self.model,
-                contents=[
-                    TRANSCRIBE_PROMPT,
-                    types.Part(
-                        inline_data=types.Blob(
-                            mime_type="audio/wav",
-                            data=wav_bytes
+        last_error = None
+        wav_bytes = self._to_wav(audio_data)
+
+        for model in self.models:
+            try:
+                print(f"logs: Trying model {model} for transcription...", flush=True)
+                response = self.client.models.generate_content(
+                    model=model,
+                    contents=[
+                        TRANSCRIBE_PROMPT,
+                        types.Part(
+                            inline_data=types.Blob(
+                                mime_type="audio/wav",
+                                data=wav_bytes
+                            )
                         )
-                    )
-                ]
-            )
-            text = response.text.strip()
-            print(f"logs: Transcription: {text}", flush=True)
-            return text
-        except Exception as e:
-            print(f"❌  Transcription error: {e}", flush=True)
-            return None
+                    ]
+                )
+                text = response.text.strip()
+                print(f"logs: ✅ {model} → {text}", flush=True)
+                return text
+            except Exception as e:
+                print(f"logs: ⚠️  {model} failed — {e}", flush=True)
+                last_error = e
+
+        print(f"❌  All transcription models failed. Last error: {last_error}", flush=True)
+        return None
 
     def _to_wav(self, audio_data: np.ndarray) -> bytes:
         buf = io.BytesIO()
@@ -110,9 +117,9 @@ class SystemAudioListener:
     Uses pyaudiowpatch for WASAPI loopback support.
     """
 
-    def __init__(self, gemini_client: genai.Client, model: str, on_transcript):
+    def __init__(self, gemini_client: genai.Client, models: list[str], on_transcript):
         self.client        = gemini_client
-        self.model         = model
+        self.models        = models
         self.on_transcript = on_transcript   # callback(text: str)
         self._frames       = []
         self._lock         = threading.Lock()
@@ -220,21 +227,30 @@ class SystemAudioListener:
                 self._pa.terminate()
 
     def _transcribe(self, audio_data: np.ndarray) -> str | None:
-        try:
-            wav_bytes = MicRecorder._to_wav(self, audio_data)
-            response  = self.client.models.generate_content(
-                model=self.model,
-                contents=[
-                    TRANSCRIBE_PROMPT,
-                    types.Part(
-                        inline_data=types.Blob(
-                            mime_type="audio/wav",
-                            data=wav_bytes
+        last_error = None
+        wav_bytes = MicRecorder._to_wav(self, audio_data)
+
+        for model in self.models:
+            try:
+                print(f"logs: Trying model {model} for system audio...", flush=True)
+                response = self.client.models.generate_content(
+                    model=model,
+                    contents=[
+                        TRANSCRIBE_PROMPT,
+                        types.Part(
+                            inline_data=types.Blob(
+                                mime_type="audio/wav",
+                                data=wav_bytes
+                            )
                         )
-                    )
-                ]
-            )
-            return response.text.strip()
-        except Exception as e:
-            print(f"❌  System audio transcription error: {e}", flush=True)
-            return None
+                    ]
+                )
+                text = response.text.strip()
+                print(f"logs: ✅ {model} → {text}", flush=True)
+                return text
+            except Exception as e:
+                print(f"logs: ⚠️  {model} failed — {e}", flush=True)
+                last_error = e
+
+        print(f"❌  All system audio models failed. Last error: {last_error}", flush=True)
+        return None
