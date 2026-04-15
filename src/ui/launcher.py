@@ -99,8 +99,24 @@ class LauncherWindow:
         self._build()
 
     def run(self) -> None:
+        self._register_system_hotkeys()
         self._hotkeys.start()
         self._root.mainloop()
+
+    def _register_system_hotkeys(self) -> None:
+        """Register hotkeys that stay active regardless of the current agent."""
+        h = self._cfg.hotkeys
+        mapping = {
+            h.switch_clipboard:    "clipboard",
+            h.switch_autotype:     "autotype",
+            h.switch_general:      "general",
+            h.switch_mcq:          "mcq",
+            h.switch_full_control: "full_control",
+        }
+        for combo, agent_key in mapping.items():
+            if combo:
+                # Use a closure for agent_key
+                self._hotkeys.register(combo, lambda k=agent_key: self._root.after(0, self._launch, k))
 
     # ── Build UI ──────────────────────────────────────────────────────────────
 
@@ -184,11 +200,33 @@ class LauncherWindow:
     def _show_welcome(self) -> None:
         self._clear_detail()
         f = self._detail_frame
-        tk.Label(f, text="✦", bg=BG, fg=ACC, font=("Segoe UI", 40)).pack(pady=(80, 4))
+        tk.Label(f, text="✦", bg=BG, fg=ACC, font=("Segoe UI", 40)).pack(pady=(60, 4))
         tk.Label(f, text="Helfi AI Toolkit", bg=BG, fg=FG,
                  font=("Segoe UI", 18, "bold")).pack()
         tk.Label(f, text="Select a feature from the sidebar to get started.",
                  bg=BG, fg=FG2, font=("Segoe UI", 11)).pack(pady=(8, 0))
+        
+        # New: Global Hotkeys Hint
+        hint_frame = tk.Frame(f, bg=CARD_BG, padx=20, pady=15)
+        hint_frame.pack(pady=40)
+        tk.Label(hint_frame, text="Quick Mode Switch (Global)", bg=CARD_BG, fg=ACC,
+                 font=("Segoe UI", 10, "bold")).pack(anchor="w")
+        
+        h = self._cfg.hotkeys
+        grid = tk.Frame(hint_frame, bg=CARD_BG)
+        grid.pack(pady=(8, 0))
+        
+        tips = [
+            (h.switch_clipboard, "To Clipboard"),
+            (h.switch_autotype,  "To Auto-Type"),
+            (h.switch_general,   "To General AI"),
+            (h.switch_mcq,       "To MCQ AI"),
+            (h.switch_full_control, "To Full Control"),
+        ]
+        for i, (hk, label) in enumerate(tips):
+            r, c = divmod(i, 2)
+            tk.Label(grid, text=f"{hk} : ", bg=CARD_BG, fg=FG2, font=("Cascadia Code", 9)).grid(row=r, column=c*2, sticky="e", pady=2)
+            tk.Label(grid, text=label, bg=CARD_BG, fg=FG, font=("Segoe UI", 9)).grid(row=r, column=c*2+1, sticky="w", padx=(0, 20))
 
     def _select(self, key: str) -> None:
         if self._selected_key == key:
@@ -310,6 +348,7 @@ class LauncherWindow:
         # Re-wire hotkeys if an agent is active
         if self._active_agent:
             self._hotkeys.clear()
+            self._register_system_hotkeys()
             self._active_agent._register_hotkeys()
 
     # ── Agent lifecycle ───────────────────────────────────────────────────────
@@ -329,6 +368,7 @@ class LauncherWindow:
             return
 
         self._hotkeys.clear()
+        self._register_system_hotkeys()  # Always keep switcher hotkeys active
         self._active_agent = agent
 
         def _run():
@@ -347,6 +387,7 @@ class LauncherWindow:
             self._active_agent.stop()
             self._active_agent = None
             self._hotkeys.clear()
+            self._register_system_hotkeys()
             self._set_status("● Stopped", RED)
 
     def _set_status(self, text: str, color: str) -> None:

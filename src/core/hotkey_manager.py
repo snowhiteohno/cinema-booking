@@ -25,8 +25,17 @@ def _parse_combo(combo_str: str) -> frozenset:
 
 def _get_char(key) -> Optional[str]:
     try:
-        return key.char
-    except AttributeError:
+        if hasattr(key, 'char') and key.char:
+            return key.char
+        # Convert Special Keys (alt, ctrl, shift, etc) to string names
+        name = str(key).replace("Key.", "").lower()
+        # Normalize modifiers
+        if "alt" in name: return "alt"
+        if "ctrl" in name: return "ctrl"
+        if "shift" in name: return "shift"
+        if "cmd" in name or "win" in name: return "win"
+        return name
+    except Exception:
         return None
 
 

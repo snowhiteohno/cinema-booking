@@ -70,9 +70,14 @@ class HotkeyConfig:
     pause_typing:    str = "a+s"
     next_file:       str = "k+n"
     retype:          str = "k+r"
-    # Transcript
     send_transcript: str = "k+."
     send_with_shot:  str = "k+,"
+    # Mode Switching
+    switch_clipboard: str = "Alt+1"
+    switch_autotype:  str = "Alt+2"
+    switch_general:   str = "Alt+3"
+    switch_mcq:       str = "Alt+4"
+    switch_full_control: str = "Alt+5"
 
 
 @dataclass

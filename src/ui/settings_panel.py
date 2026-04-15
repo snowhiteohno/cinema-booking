@@ -124,6 +124,18 @@ class SettingsPanel:
         ]
         for label, key, val in fields:
             self._row(t, label, f"hk_{key}", val)
+
+        _section(t, "Mode Switching")
+        switch_fields = [
+            ("To Clipboard",     "switch_clipboard",    hk.switch_clipboard),
+            ("To Auto-Type",     "switch_autotype",     hk.switch_autotype),
+            ("To General AI",    "switch_general",      hk.switch_general),
+            ("To MCQ AI",        "switch_mcq",          hk.switch_mcq),
+            ("To Full Control",  "switch_full_control", hk.switch_full_control),
+        ]
+        for label, key, val in switch_fields:
+            self._row(t, label, f"hk_{key}", val)
+
         _label(t, "Format: key+key  e.g. k+,  or  m+n", fg="#555577").pack(pady=(8, 0))
 
     def _tab_overlay(self, nb) -> None:
@@ -191,8 +203,13 @@ class SettingsPanel:
         hk.stop_typing     = g("hk_stop_typing")
         hk.next_file       = g("hk_next_file")
         hk.retype          = g("hk_retype")
-        hk.send_transcript = g("hk_send_transcript")
-        hk.send_with_shot  = g("hk_send_with_shot")
+        hk.send_transcript   = g("hk_send_transcript")
+        hk.send_with_shot    = g("hk_send_with_shot")
+        hk.switch_clipboard   = g("hk_switch_clipboard")
+        hk.switch_autotype    = g("hk_switch_autotype")
+        hk.switch_general     = g("hk_switch_general")
+        hk.switch_mcq         = g("hk_switch_mcq")
+        hk.switch_full_control = g("hk_switch_full_control")
 
         o = self._cfg.overlay
         o.alpha       = g("ov_alpha",  float)
