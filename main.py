@@ -119,8 +119,8 @@ if __name__ == "__main__":
     _setup_path()
 
     parser = argparse.ArgumentParser(
-        prog="DontCheat",
-        description="Don't Cheat AI Toolkit — GUI or headless mode."
+        prog="Helfi",
+        description="Helfi AI Toolkit — GUI or headless mode."
     )
     parser.add_argument(
         "--agent", "-a",

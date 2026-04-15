@@ -5,10 +5,21 @@ Left panel: agent cards. Right panel: description + hotkeys + settings toggle.
 """
 from __future__ import annotations
 
+import os
 import sys
 import threading
 import tkinter as tk
 from typing import Optional
+
+def resource_path(relative_path: str) -> str:
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        # Assume we are run from the project root in dev mode
+        base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    return os.path.join(base_path, relative_path)
+
 
 from src.core.config import Config, save_config
 from src.core.hotkey_manager import HotkeyManager
@@ -95,16 +106,16 @@ class LauncherWindow:
 
     def _build(self) -> None:
         r = self._root
-        r.title("Don't Cheat — AI Toolkit")
+        r.title("Helfi — AI Toolkit")
         r.configure(bg=BG)
         r.geometry("820x580")
         r.resizable(False, False)
         r.protocol("WM_DELETE_WINDOW", self._on_close)
 
         try:
-            r.iconbitmap(default="")
-        except Exception:
-            pass
+            r.iconbitmap(default=resource_path("logo.ico"))
+        except Exception as e:
+            print(f"Warning: Could not load icon ({e})")
 
         # ── Main layout: sidebar + detail ─────────────────────────────────────
         sidebar_outer = tk.Frame(r, bg=SIDEBAR, width=240)
@@ -115,7 +126,7 @@ class LauncherWindow:
         self._detail_frame.pack(side="right", fill="both", expand=True)
 
         # Sidebar header (Fixed at top)
-        tk.Label(sidebar_outer, text="✦ Don't Cheat", bg=SIDEBAR, fg=ACC,
+        tk.Label(sidebar_outer, text="✦ Helfi", bg=SIDEBAR, fg=ACC,
                  font=("Segoe UI", 13, "bold")).pack(pady=(20, 4), padx=12, anchor="w")
         tk.Label(sidebar_outer, text="AI Toolkit v2.0", bg=SIDEBAR, fg=FG2,
                  font=("Segoe UI", 9)).pack(padx=12, anchor="w")
@@ -174,7 +185,7 @@ class LauncherWindow:
         self._clear_detail()
         f = self._detail_frame
         tk.Label(f, text="✦", bg=BG, fg=ACC, font=("Segoe UI", 40)).pack(pady=(80, 4))
-        tk.Label(f, text="Don't Cheat AI Toolkit", bg=BG, fg=FG,
+        tk.Label(f, text="Helfi AI Toolkit", bg=BG, fg=FG,
                  font=("Segoe UI", 18, "bold")).pack()
         tk.Label(f, text="Select a feature from the sidebar to get started.",
                  bg=BG, fg=FG2, font=("Segoe UI", 11)).pack(pady=(8, 0))
@@ -381,12 +392,15 @@ class LauncherWindow:
     def _create_tray_icon(self) -> None:
         try:
             import pystray
-            from PIL import Image, ImageDraw
+            from PIL import Image
 
-            # Create a simple generic icon for the tray
-            image = Image.new('RGB', (64, 64), color=(124, 106, 247))
-            d = ImageDraw.Draw(image)
-            d.text((16, 24), "DC", fill=(255, 255, 255))
+            try:
+                image = Image.open(resource_path("logo.png"))
+            except Exception:
+                from PIL import ImageDraw
+                image = Image.new('RGB', (64, 64), color=(124, 106, 247))
+                d = ImageDraw.Draw(image)
+                d.text((16, 24), "HF", fill=(255, 255, 255))
 
             def on_show(icon, item):
                 icon.stop()
@@ -397,11 +411,11 @@ class LauncherWindow:
                 self._root.after(0, self._quit_app)
 
             menu = pystray.Menu(
-                pystray.MenuItem("Show Don't Cheat", on_show, default=True),
+                pystray.MenuItem("Show Helfi", on_show, default=True),
                 pystray.MenuItem('Exit completely', on_exit)
             )
 
-            icon = pystray.Icon("DontCheat", image, "Don't Cheat AI Toolkit", menu)
+            icon = pystray.Icon("Helfi", image, "Helfi AI Toolkit", menu)
             # This blocks the thread, which is fine since we are in a daemon thread.
             icon.run()
         except ImportError:

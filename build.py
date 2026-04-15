@@ -1,7 +1,7 @@
 """
 build.py — PyInstaller build script
 Run: python build.py
-Output: dist/DontCheat.exe
+Output: dist/Helfi.exe
 """
 import subprocess
 import sys
@@ -14,8 +14,11 @@ cmd = [
     "--noconfirm",
     "--onefile",
     "--windowed",                         # No console window for the launcher
-    "--name", "DontCheat",
+    "--name", "Helfi",
+    "--icon", f"{ROOT}/logo.ico",
     "--add-data", f"{ROOT}/src;src",      # Bundle the src package
+    "--add-data", f"{ROOT}/logo.ico;.",    # Bundle the icon for UI
+    "--add-data", f"{ROOT}/logo.png;.",    # Bundle the png for pystray
     "--hidden-import", "google.genai",
     "--hidden-import", "sounddevice",
     "--hidden-import", "pyaudiowpatch",
@@ -27,12 +30,12 @@ cmd = [
     f"{ROOT}/main.py",
 ]
 
-print(">>  Building DontCheat.exe with PyInstaller...")
+print(">>  Building Helfi.exe with PyInstaller...")
 print(" ".join(cmd))
 result = subprocess.run(cmd, cwd=ROOT)
 
 if result.returncode == 0:
-    print("\n>>  Build succeeded! -> dist/DontCheat.exe")
+    print("\n>>  Build succeeded! -> dist/Helfi.exe")
 else:
     print("\n!!  Build failed. See output above.")
     sys.exit(1)

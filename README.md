@@ -1,4 +1,4 @@
-# Don't Cheat AI Toolkit v2.0
+# Helfi AI Toolkit v2.0
 
 A complete, unified desktop application for AI assistance. It captures your screen, listens to audio, and sends context to Gemini. Answers are delivered via clipboard, automated typing, or floating transparent overlays. Perfect for coding, conceptual questions, MCQs, and interview preparation.
 
@@ -33,7 +33,7 @@ Don't want to run from terminal every time? Build a `.exe`:
 ```bash
 python build.py
 ```
-This drops a standalone `DontCheat.exe` into the `dist/` folder. You can pin it to your taskbar!
+This drops a standalone `Helfi.exe` into the `dist/` folder. You can pin it to your taskbar!
 
 ---
 
