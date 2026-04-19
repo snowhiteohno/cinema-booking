@@ -1,85 +1,114 @@
-# Helfi AI Toolkit v2.0
+# Helfi AI Toolkit v2.0 🚀
 
-A complete, unified desktop application for AI assistance. It captures your screen, listens to audio, and sends context to Gemini. Answers are delivered via clipboard, automated typing, or floating transparent overlays. Perfect for coding, conceptual questions, MCQs, and interview preparation.
+A premium, modular AI-powered desktop toolkit for productivity, coding, and educational assistance. **Helfi** leverages Google’s Gemini AI to interpret your screen, transcribe meetings in real-time, and automate tedious tasks through human-like typing or subtle overlays.
 
 ---
 
-## 🛠️ Setup
+## ✨ Key Features
 
-### 1. Install dependencies
+- **Unified Launcher**: A sleek, dark-mode dashboard to manage all AI agents and settings.
+- **Global Mode Switching**: Instantly switch between agents from anywhere using `Alt + 1-5`.
+- **7 specialized Agents**: From MCQ solving to multi-file coding architectures.
+- **Human-Like Simulation**: Typing engine with randomized delays and smart indentation clearing.
+- **Stealth Overlays**: Transparent, borderless windows that deliver answers without interrupting your workflow (invisible to most recording software).
+- **Audio Intelligence**: Real-time transcription of both Microphone and System Audio (Speakers) for meeting assistance.
+- **Model Fallbacks**: Automatically switches from `Gemini Flash` → `Gemini Pro` if rate limits or errors occur.
+
+---
+
+## 🛠️ Getting Started
+
+### 1. Installation
+Ensure you have Python 3.9+ installed, then run:
 ```bash
 pip install -r requirements.txt
 ```
-*(Includes `google-genai`, `pynput`, `mss`, `Pillow`, `pyperclip`, `sounddevice`, `pyaudiowpatch`, `pyinstaller`)*
 
-### 2. Configure Environment
-Create a `.env` file in the root project folder containing your free Gemini API key:
+### 2. Configuration
+Create a `.env` file in the root directory with your API key:
 ```text
-GEMINI_API_KEY=your-key-here
+GEMINI_API_KEY=your_google_ai_studio_key
 ```
 *(Get a free key at [Google AI Studio](https://aistudio.google.com/app/apikey))*
 
-### 3. Run the Desktop App
+### 3. Launching
+Start the **Launcher GUI** to pick your agent:
 ```bash
 python main.py
 ```
-This opens the sleek, dark-mode **Launcher UI**. From here, you can:
-1. Select the specific AI agent you want to run (e.g., Clipboard, AutoType, Real-Time Transcript).
-2. Configure **Settings** (hotkeys, typing speeds, overlay colors & transparency).
-3. Click **Launch** to start the listener in the background.
+*Note: You can also run agents headlessly using `python main.py --agent mcq`.*
 
-### 4. Build a Standalone Executable (Optional)
-Don't want to run from terminal every time? Build a `.exe`:
+### 4. Build Executable
+To create a standalone `Helfi.exe` for Windows:
 ```bash
 python build.py
 ```
-This drops a standalone `Helfi.exe` into the `dist/` folder. You can pin it to your taskbar!
 
 ---
 
-## 🤖 Available Agents
+## 🤖 The Helfi Agents
 
-The v2.0 architecture combines all 6 legacy scripts into a single unified app. Every agent supports model fallbacks (`Flash -> Pro -> Flash Lite`), customizable hotkeys, and config persistence.
-
-### 1. Clipboard Copy
-Captures screenshots and copies the AI-generated code directly to your clipboard.
-- **Goal:** Fastest way to get raw code snippets for pasting.
-
-### 2. Auto-Type
-Simulates human-like typing to enter code character-by-character.
-- **Bypasses:** Sites that block `Ctrl+V` (e.g., HackerRank, LeetCode).
-- **Features:** Start / Stop / Pause hotkeys. Smart indentation formatting.
-
-### 3. General AI
-An adaptive tool that detects the question type and auto-types the response.
-- **Coding:** Returns raw executable code.
-- **Theory / Math:** Types the step-by-step solution.
-
-### 4. MCQ AI
-Specialized for Multiple Choice Questions with a tiny, transparent, borderless overlay.
-- **Features:** Returns comma-separated options (`A,C`) if multiple answers are correct. Completely invisible to screen recording/sharing software.
-
-### 5. Multi-File Auto-Type
-Specialized for **Low-Level Design (LLD)** and multi-file coding workflows.
-- **Workflow:** Gemini generates logic for multiple files. The tool types a summary, and you advance through typing each file sequence using the `Next File` hotkey.
-
-### 6. Full Control (Interview Mode)
-The most advanced overlay, featuring an interactive markdown chat, memory, and mic/system audio capabilities.
-- **Features:** Hold a hotkey to record your mic, or toggle the system audio listener to transcribe what an interviewer is saying. Follow up directly in the chat box.
-
-### 7. Real-Time Transcript
-Always-on dual-stream audio capture (Mic + System Audio).
-- **Features:** Builds a silent real-time transcript in the background. Press the query hotkey to instantly analyze the transcript history and answer the interviewer's most recent question in the overlay.
+| Agent | Purpose | Primary Hotkeys | Quick Switch |
+| :--- | :--- | :--- | :--- |
+| **Auto-Type** | Human-like typing for coding. Includes **Multi-File LLD mode**. | `k+,` (Add) / `k+.` (Send) | `Alt + 2` |
+| **Full Control** | **Unified Assistant**: Screenshots + Text Chat + Real-time Audio Transcript. | `k+,` (Add) / `m+n` (Overlay) | `Alt + 5` |
+| **MCQ AI** | Stealth overlay for multiple choice questions. | `k+,` (Add) / `k+.` (Send) | `Alt + 4` |
+| **General AI** | Detects question type; types code or theory solutions. | `k+,` (Add) / `k+.` (Send) | `Alt + 3` |
+| **Clipboard** | Fast code generation directly to your clipboard. | `k+,` (Add) / `k+.` (Send) | `Alt + 1` |
 
 ---
 
-## ⚙️ Customization (settings.json)
-All customizations are done via the built-in **Settings** panel in the Launcher GUI.
-Changes are saved to `settings.json` locally and remembered forever.
-- Rebind any hotkey.
-- Change typing simulator speeds.
-- Change overlay transparency (alpha), background color, text color, and accent color.
-- Re-order Gemini model fallbacks.
+### Featured Workflows
+
+#### 1. Full Control (The Unified Assistant)
+The most advanced mode. It combines a floating markdown chat with real-time audio detection.
+- **Manual Mode**: Capture screenshots (`k+,`) and get solutions in the chat box.
+- **Auto Mode**: Click the 🔊 icon to enable the **Debounce Listener**. It automatically transcribes speakers (Interviewer) and your Mic, then sends concise answers to the overlay.
+
+#### 2. Auto-Type & Multi-File
+Designed for sites that block pasting.
+- **Standard**: Types a single block of code character-by-character.
+- **Multi-File Toggle**: Enable this in the Launcher to handle Low-Level Design (LLD) questions. Gemini will generate folder structures and multiple files; use the `Next File` hotkey (`k+n`) to cycle through them.
+
+#### 3. Stealth MCQ
+Uses a tiny, borderless, transparent overlay that is nearly invisible to screen sharing. Ideal for quick answer verification.
+
+---
+
+## 🏗️ Architecture
+
+Helfi v2.0 follows a modular, plugin-based architecture for easy expansion:
+
+```text
+/src
+ ├── agents/     # Independent AI features (plugins)
+ ├── audio/      # Microphone & System Audio capture
+ ├── core/       # Gemini Client, Hotkey Manager, Screenshot logic
+ ├── ui/         # Modern Launcher and Overlay windows
+ └── utils/      # Text cleaners and formatting logic
+```
+
+### For Developers: Adding an Agent
+1. Create a new file in `src/agents/my_agent.py`.
+2. Inherit from `BaseAgent`.
+3. Register your hotkeys and implement the `_run()` method.
+4. Add your agent key to the registry in `main.py`.
+
+---
+
+## ⚙️ Customization (`settings.json`)
+Manage all preferences via the **Settings** panel in the UI:
+- **Hotkeys**: Rebind any shortcut to avoid conflicts with your IDE.
+- **Typing Engine**: Adjust Min/Max delays and startup wait time.
+- **Appearance**: Customize overlay colors, transparency (Alpha), and font sizes.
+- **Models**: Prioritize which Gemini versions to use.
+
+---
 
 ## ⚠️ Disclaimer
-This tool is for educational and accessibility purposes only. Please adhere to the academic integrity policies of your institution or organization.
+Helfi is designed for **accessibility and educational purposes**. Using this toolkit to violate academic integrity policies or professional codes of conduct is strictly discouraged. The developers are not responsible for any misuse.
+
+---
+
+*Built with ❤️ for power users.*
+
