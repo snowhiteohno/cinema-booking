@@ -1,51 +1,44 @@
 """
 src/ui/mcq_overlay.py
-Unified MCQ overlay running in the same process via BaseOverlay.
-Extremely minimal floating text overlay with a fully transparent background.
+Tiny floating MCQ answer overlay. Cross-platform.
 """
 from __future__ import annotations
 
 import tkinter as tk
 from src.core.overlay_base import BaseOverlay
 
-# Using #000001 as the exact transparent key from legacy
-BG      = "#000001"
+BG = "#0a0a14"
+
 
 class MCQOverlay(BaseOverlay):
     def __init__(self):
         super().__init__(
             title="mcq",
-            alpha=1.0,
+            alpha=0.92,
             bg=BG,
-            width=80,
-            height=40,
+            width=90,
+            height=44,
             pos_x=-1,
-            pos_y=-1 # Handled in configure_window or build_content
+            pos_y=-1,
         )
         self._lbl = None
 
     def _configure_window(self) -> None:
         super()._configure_window()
-        try:
-            self.root.attributes("-transparentcolor", BG)
-        except Exception:
-            pass
-
         sw = self.root.winfo_screenwidth()
         sh = self.root.winfo_screenheight()
-        self.root.geometry(f"80x40+{sw - 110}+{sh - 110}")
+        self.root.geometry(f"90x44+{sw - 120}+{sh - 120}")
 
     def _build_content(self) -> None:
         self._lbl = tk.Label(
-            self.root, 
-            text="—", 
-            bg=BG, 
-            fg="#00ff88", 
-            font=("Segoe UI", 14, "bold"), 
-            justify="center"
+            self.root,
+            text="—",
+            bg=BG,
+            fg="#00ff88",
+            font=("monospace", 14, "bold"),
+            justify="center",
         )
         self._lbl.pack(fill="both", expand=True)
-        
         self._bind_drag(self._lbl)
 
     def set_thinking(self) -> None:
@@ -55,8 +48,8 @@ class MCQOverlay(BaseOverlay):
         self.schedule(self._update_main, answer, "#00ff88")
 
     def set_error(self, err_msg: str = "") -> None:
-        self.schedule(self._update_main, "✕", "#ff5555")
-        
+        self.schedule(self._update_main, "ERR", "#ff5555")
+
     def set_log(self, log_msg: str) -> None:
         pass
 
@@ -68,7 +61,3 @@ class MCQOverlay(BaseOverlay):
         if self.root:
             self.schedule(self.root.destroy)
         self.visible = False
-
-
-
-

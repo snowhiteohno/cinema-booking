@@ -11,15 +11,17 @@ import threading
 import time
 from typing import List
 
-from pynput.keyboard import Controller, Key
-
 from src.agents.base_agent import BaseAgent, HotkeyDef
 from src.core.gemini_client import GeminiClient
 from src.core.screenshot import take_screenshot
+from src.core.typer import UInputTyper
 
 PROMPT = (
     "Analyze this screenshot carefully and respond with the most useful answer possible. "
-    "- Coding problem → working code solution, no explanations. "
+    "- Coding problem → working code solution, no explanations, no comments. "
+    "  LANGUAGE: Look for a language selector/dropdown/tab in the screenshot first. "
+    "  If one is visible (e.g. 'Java 21', 'C++17'), you MUST use that language. "
+    "  Only default to Python if no language indicator exists anywhere. "
     "- Theory / concept → clear, concise answer. "
     "- MCQ → correct option and one-line reason. "
     "- Math → solution with steps. "
@@ -55,7 +57,7 @@ class GeneralAgent(BaseAgent):
 
     def _run(self) -> None:
         self._gemini      = GeminiClient(self._config.api_key, self._config.models)
-        self._kb          = Controller()
+        self._kb          = UInputTyper()
         self._queue:      list  = []
         self._q_lock      = threading.Lock()
         self._processing  = False
@@ -105,16 +107,34 @@ class GeneralAgent(BaseAgent):
         t = self._config.typing
         print(f"⌨️  Typing in {t.startup_delay}s...", flush=True)
         time.sleep(t.startup_delay)
-        self._is_typing = True
+        self._is_typing  = True
         self._is_stopped = False
-        for char in answer:
-            if not self._pause_event.wait() or self._is_stopped:
-                break
-            self._kb.type(char)
-            time.sleep(random.uniform(t.delay_min, t.delay_max))
+
+        lines = answer.splitlines()
+        for i, line in enumerate(lines):
+            for char in line:
+                if not self._pause_event.wait() or self._is_stopped:
+                    self._is_typing = False
+                    return
+                self._kb.type_char(char, delay=random.uniform(t.delay_min, t.delay_max))
+
+            if i < len(lines) - 1:
+                if not self._pause_event.wait() or self._is_stopped:
+                    self._is_typing = False
+                    return
+                self._kb.press_key('enter')
+                time.sleep(0.05)
+                self._clear_auto_indent()
+
         self._is_typing = False
         if not self._is_stopped:
             print("✅  Done!", flush=True)
+
+    def _clear_auto_indent(self) -> None:
+        self._kb.press_key('home'); time.sleep(0.02)
+        self._kb.press_key('home'); time.sleep(0.02)
+        self._kb.press_key('end', shift=True); time.sleep(0.03)
+        self._kb.press_key('delete'); time.sleep(0.04)
 
     def _toggle_pause(self) -> None:
         if not self._is_typing:

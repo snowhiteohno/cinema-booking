@@ -35,21 +35,29 @@ class GeminiClient:
 
     # ── Public API ────────────────────────────────────────────────────────────
 
-    def generate(self, contents: Any, models: Optional[List[str]] = None) -> str:
+    def generate(self, contents: Any, models: Optional[List[str]] = None,
+                 thinking: bool = False) -> str:
         """
         Call Gemini with fallback.
         `contents` can be a string, list of strings/Parts, or a Content object.
+        `thinking=True` enables Gemini 2.5 thinking mode (higher accuracy, slower).
         Returns the text response.
         Raises RuntimeError if all models fail.
         """
         model_list = models or self.models
         last_error = None
+        config = None
+        if thinking:
+            config = types.GenerateContentConfig(
+                thinking_config=types.ThinkingConfig(thinking_budget=8192)
+            )
         for model in model_list:
             try:
                 print(f"logs: Trying {model}...", flush=True)
-                response = self._client.models.generate_content(
-                    model=model, contents=contents
-                )
+                kwargs: dict = {"model": model, "contents": contents}
+                if config is not None:
+                    kwargs["config"] = config
+                response = self._client.models.generate_content(**kwargs)
                 text = response.text.strip()
                 print(f"logs: ✅ {model} responded.", flush=True)
                 return text

@@ -10,24 +10,34 @@ import threading
 import time
 from typing import List
 
-from pynput.keyboard import Controller, Key
-
 from src.agents.base_agent import BaseAgent, HotkeyDef
 from src.core.config import Config
 from src.core.gemini_client import GeminiClient
 from src.core.screenshot import take_screenshot
+from src.core.typer import UInputTyper
 from src.utils.code_cleaner import clean_code_response
 
 PROMPT = (
-    "You are a coding assistant. The screenshots contain a coding problem or question. "
-    "Analyze all provided screenshots together as one combined context. "
-    "Output ONLY the raw executable code. "
-    "ABSOLUTE RULES: "
-    "1. Zero comments of any kind — no #, no //, no /* */, no docstrings. "
-    "2. No markdown, no backticks, no code fences. "
-    "3. No explanations, no preamble, no trailing text. "
-    "4. Use exactly 4 spaces per indent level — no tabs. "
-    "If you add anything other than raw code, you have failed the task."
+    "You are a coding assistant. Solve the problem in the screenshots.\n\n"
+    "STEP 1 — CHECK FOR EXPLICIT USER INSTRUCTION (absolute top priority):\n"
+    "Look for any text the user has typed as a direct instruction, such as:\n"
+    "  '// use java', 'write in kotlin', 'explain this', 'solve in C++', 'use recursion', etc.\n"
+    "This could appear anywhere — in the code editor, a comment, a text box, a sticky note visible on screen.\n"
+    "If found, follow it EXACTLY and IGNORE all other signals below.\n\n"
+    "STEP 2 — IDENTIFY THE SUBMISSION LANGUAGE (if no explicit instruction):\n"
+    "Scan every screenshot for a language selector, dropdown, or label near a code editor or submit button.\n"
+    "Examples of programming languages: 'Java 21', 'C++17', 'Python 3', 'GNU G++17', 'Kotlin', 'Go'.\n"
+    "Examples of database/query languages: 'MySQL', 'MySQL 8.0', 'PostgreSQL', 'Oracle SQL', 'MS SQL Server', 'SQLite'.\n"
+    "If the selector shows a SQL/database variant → write a SQL query, NOT code in any programming language.\n"
+    "Whatever the selector says is your output language — do NOT be misled by problem statement examples, "
+    "code already in the editor, platform defaults, or your own preference. "
+    "Only if NO selector is visible anywhere, default to Python.\n\n"
+    "STEP 3 — WRITE THE SOLUTION.\n\n"
+    "ABSOLUTE OUTPUT RULES:\n"
+    "1. Raw executable output only — zero comments, zero explanations, zero markdown.\n"
+    "2. No backticks, no code fences, no preamble, no trailing text.\n"
+    "3. For code: 4 spaces per indent level, no tabs. For SQL: standard formatting is fine.\n"
+    "Outputting anything other than the raw solution is a failure."
 )
 
 
@@ -58,7 +68,7 @@ class AutoTypeAgent(BaseAgent):
 
     def _run(self) -> None:
         self._gemini      = GeminiClient(self._config.api_key, self._config.models)
-        self._kb          = Controller()
+        self._kb          = UInputTyper()
         self._queue:      list  = []
         self._q_lock      = threading.Lock()
         self._processing  = False
@@ -132,15 +142,13 @@ class AutoTypeAgent(BaseAgent):
                 if not self._wait_if_paused():
                     self._is_typing = False
                     return
-                self._kb.type(char)
-                time.sleep(random.uniform(t.delay_min, t.delay_max))
+                self._kb.type_char(char, delay=random.uniform(t.delay_min, t.delay_max))
 
             if i < len(lines) - 1:
                 if not self._wait_if_paused():
                     self._is_typing = False
                     return
-                self._kb.press(Key.enter)
-                self._kb.release(Key.enter)
+                self._kb.press_key('enter')
                 time.sleep(0.05)
                 self._clear_auto_indent()
 
@@ -151,14 +159,12 @@ class AutoTypeAgent(BaseAgent):
         return not self._is_stopped
 
     def _clear_auto_indent(self) -> None:
-        self._kb.press(Key.home);  self._kb.release(Key.home)
-        time.sleep(0.03)
-        self._kb.press(Key.shift)
-        self._kb.press(Key.end);   self._kb.release(Key.end)
-        self._kb.release(Key.shift)
-        time.sleep(0.03)
-        self._kb.press(Key.delete); self._kb.release(Key.delete)
-        time.sleep(0.03)
+        # Press Home twice: once to go to first non-whitespace (Monaco/web editors),
+        # second time to reach actual column 0.
+        self._kb.press_key('home'); time.sleep(0.02)
+        self._kb.press_key('home'); time.sleep(0.02)
+        self._kb.press_key('end', shift=True); time.sleep(0.03)
+        self._kb.press_key('delete'); time.sleep(0.04)
 
     def _toggle_pause(self) -> None:
         if not self._is_typing:

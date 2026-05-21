@@ -1,12 +1,11 @@
 google-genai
 python-dotenv
 pynput
+keyboard
 mss
 Pillow
 pyperclip
 sounddevice
-pyaudiowpatch
 numpy
 scipy
-pyinstaller
-pystray
+evdev; sys_platform == "linux"

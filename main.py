@@ -82,6 +82,7 @@ def run_headless(agent_key: str):
         "autotype":     "src.agents.autotype_agent.AutoTypeAgent",
         "general":      "src.agents.general_agent.GeneralAgent",
         "mcq":          "src.agents.mcq_agent.MCQAgent",
+        "combo":        "src.agents.combo_agent.ComboAgent",
         "full_control": "src.agents.full_control_agent.FullControlAgent",
         "multifile":    "src.agents.multifile_agent.MultiFileAgent",
         # "transcript" is merged into full_control (use --agent full_control)

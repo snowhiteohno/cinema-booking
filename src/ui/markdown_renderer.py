@@ -1,7 +1,6 @@
 """
 src/ui/markdown_renderer.py
-Shared Markdown-to-Tkinter renderer.
-Single implementation — no more duplication between overlay files.
+Markdown-to-Tkinter renderer. Cross-platform font detection.
 """
 from __future__ import annotations
 
@@ -10,9 +9,24 @@ import tkinter as tk
 from tkinter import font as tkfont
 
 
-class MarkdownRenderer:
-    """Renders Markdown text into a tk.Text widget with styled tags."""
+def _pick_mono() -> tuple:
+    families = tkfont.families()
+    for name in ("Cascadia Code", "JetBrains Mono", "Fira Code",
+                 "DejaVu Sans Mono", "Liberation Mono", "Consolas", "Courier New", "monospace"):
+        if name in families:
+            return (name, 10)
+    return ("TkFixedFont", 10)
 
+
+def _pick_sans() -> str:
+    families = tkfont.families()
+    for name in ("Segoe UI", "Ubuntu", "DejaVu Sans", "Liberation Sans", "Helvetica"):
+        if name in families:
+            return name
+    return "TkDefaultFont"
+
+
+class MarkdownRenderer:
     def __init__(self, text_widget: tk.Text,
                  fg: str = "#c8c8d0", bg: str = "#0e0e1a", accent: str = "#7c6af7"):
         self.widget = text_widget
@@ -22,28 +36,27 @@ class MarkdownRenderer:
         self._define_tags()
 
     def _define_tags(self) -> None:
-        mono = ("Cascadia Code", 10) if "Cascadia Code" in tkfont.families() else ("Consolas", 10)
+        mono = _pick_mono()
+        sans = _pick_sans()
         w = self.widget
-        w.tag_configure("h1",          font=("Segoe UI", 17, "bold"),   foreground="#ffffff",  spacing3=5)
-        w.tag_configure("h2",          font=("Segoe UI", 14, "bold"),   foreground="#e2e2e2",  spacing3=4)
-        w.tag_configure("h3",          font=("Segoe UI", 12, "bold"),   foreground="#c0c0c0",  spacing3=3)
-        w.tag_configure("bold",        font=("Segoe UI", 11, "bold"),   foreground="#f0f0f0")
-        w.tag_configure("italic",      font=("Segoe UI", 11, "italic"), foreground="#d0d0d0")
-        w.tag_configure("normal",      font=("Segoe UI", 11),           foreground=self.fg)
-        w.tag_configure("inline_code", font=mono,  foreground="#7dd3a8", background="#1a1a2e")
-        w.tag_configure("code_block",  font=mono,  foreground="#a8d8ea", background="#0d0d1a",
+        w.tag_configure("h1",          font=(sans, 17, "bold"),   foreground="#ffffff",  spacing3=5)
+        w.tag_configure("h2",          font=(sans, 14, "bold"),   foreground="#e2e2e2",  spacing3=4)
+        w.tag_configure("h3",          font=(sans, 12, "bold"),   foreground="#c0c0c0",  spacing3=3)
+        w.tag_configure("bold",        font=(sans, 11, "bold"),   foreground="#f0f0f0")
+        w.tag_configure("italic",      font=(sans, 11, "italic"), foreground="#d0d0d0")
+        w.tag_configure("normal",      font=(sans, 11),           foreground=self.fg)
+        w.tag_configure("inline_code", font=mono, foreground="#7dd3a8", background="#1a1a2e")
+        w.tag_configure("code_block",  font=mono, foreground="#a8d8ea", background="#0d0d1a",
                         lmargin1=10, lmargin2=10, rmargin=10, spacing1=2, spacing3=2)
         w.tag_configure("code_lang",   font=(mono[0], 9), foreground="#44446a", background="#0d0d1a")
-        w.tag_configure("bullet",      font=("Segoe UI", 11), foreground=self.accent, lmargin1=8, lmargin2=22)
-        w.tag_configure("divider",     font=("Segoe UI", 3),  foreground="#22223a")
-        w.tag_configure("ai_header",   font=("Segoe UI", 9, "bold"), foreground=self.accent,  spacing1=10, spacing3=4)
-        w.tag_configure("user_header", font=("Segoe UI", 9, "bold"), foreground="#3a9f6e",    spacing1=10, spacing3=4)
-        w.tag_configure("user_text",   font=("Segoe UI", 11),         foreground="#a0e8c0",   lmargin1=4)
-        w.tag_configure("thinking",    font=("Segoe UI", 10, "italic"), foreground="#555577")
-        w.tag_configure("sys_header",  font=("Segoe UI", 9, "bold"), foreground="#e0a050",    spacing1=10, spacing3=4)
-        w.tag_configure("sys_text",    font=("Segoe UI", 11, "italic"), foreground="#e8c88a", lmargin1=4)
-
-    # ── Public append methods ─────────────────────────────────────────────────
+        w.tag_configure("bullet",      font=(sans, 11), foreground=self.accent, lmargin1=8, lmargin2=22)
+        w.tag_configure("divider",     font=(sans, 3),  foreground="#22223a")
+        w.tag_configure("ai_header",   font=(sans, 9, "bold"), foreground=self.accent,  spacing1=10, spacing3=4)
+        w.tag_configure("user_header", font=(sans, 9, "bold"), foreground="#3a9f6e",    spacing1=10, spacing3=4)
+        w.tag_configure("user_text",   font=(sans, 11),         foreground="#a0e8c0",   lmargin1=4)
+        w.tag_configure("thinking",    font=(sans, 10, "italic"), foreground="#555577")
+        w.tag_configure("sys_header",  font=(sans, 9, "bold"), foreground="#e0a050",    spacing1=10, spacing3=4)
+        w.tag_configure("sys_text",    font=(sans, 11, "italic"), foreground="#e8c88a", lmargin1=4)
 
     def append_ai(self, md: str) -> None:
         self._ins("✦ AI  " + "─" * 42 + "\n", "ai_header")
@@ -56,7 +69,7 @@ class MarkdownRenderer:
         self._ins("\n", "normal")
 
     def append_system_audio(self, text: str) -> None:
-        self._ins("🔊 Interviewer  " + "─" * 35 + "\n", "sys_header")
+        self._ins("Interviewer  " + "─" * 35 + "\n", "sys_header")
         self._ins(text + "\n", "sys_text")
         self._ins("\n", "normal")
 
@@ -77,8 +90,6 @@ class MarkdownRenderer:
         self.widget.configure(state="normal")
         self.widget.delete("1.0", tk.END)
         self.widget.configure(state="disabled")
-
-    # ── Markdown rendering internals ──────────────────────────────────────────
 
     def _render_md(self, md: str) -> None:
         lines         = md.splitlines()

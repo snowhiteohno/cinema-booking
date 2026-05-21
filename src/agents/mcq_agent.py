@@ -14,11 +14,17 @@ from src.core.gemini_client import GeminiClient
 from src.core.screenshot import take_screenshot
 
 PROMPT = (
-    "Extract the correct option letter(s) (A, B, C, D, etc.) from the MCQ images. "
-    "If options are not labeled, assign them letters A, B, C, D... consecutively. "
-    "If multiple answers are potentially correct for one question, return them as a comma-separated list. "
-    "If there are multiple distinct questions in the screenshot, separate the answers for each question with a pipe character (|). "
-    "Order answers by confidence. Response must contain ONLY option characters, commas, and pipes — no words or explanations."
+    "You are an expert at solving multiple choice questions. "
+    "Carefully read the question and ALL options in the screenshot, then select the correct answer(s).\n\n"
+    "CRITICAL: First count how many options are shown. If there are 4 options, valid letters are ONLY A, B, C, D. "
+    "If there are 3 options, valid letters are ONLY A, B, C. NEVER use a letter that does not correspond to an "
+    "actual option visible in the screenshot. Do not invent options that are not there.\n\n"
+    "Think through each option before deciding. Then on the VERY LAST LINE of your response, "
+    "write ONLY the answer in this exact format:\n"
+    "  Single answer:             B\n"
+    "  Multiple correct options:  A,C\n"
+    "  Multiple questions:        B|A,C|D   (one group per question, separated by |)\n\n"
+    "The last line must contain ONLY letters that label actual options, commas, and pipes — nothing else."
 )
 
 
@@ -64,13 +70,18 @@ class MCQAgent(BaseAgent):
     # ── Actions ───────────────────────────────────────────────────────────────
 
     def _add_to_queue(self) -> None:
+        import time
+        was_visible = hasattr(self, '_overlay') and self._overlay and self._overlay.visible
+        if was_visible:
+            self._overlay.hide()
+            time.sleep(0.15)
         img = take_screenshot()
+        if was_visible:
+            self._overlay.show()
         with self._q_lock:
             self._queue.append(img)
             n = len(self._queue)
-        print(f"📸  Screenshot #{n} queued.", flush=True)
-        if hasattr(self, '_overlay') and self._overlay:
-            self._overlay.set_log(f"Queued {n} image(s)")
+        print(f"Screenshot #{n} queued.", flush=True)
 
     def _send_queue(self) -> None:
         with self._q_lock:
@@ -89,7 +100,11 @@ class MCQAgent(BaseAgent):
             try:
                 if hasattr(self, '_overlay') and self._overlay:
                     self._overlay.set_thinking()
-                answer = self._gemini.generate([PROMPT] + imgs)
+                answer = self._gemini.generate(
+                    [PROMPT] + imgs,
+                    models=["gemini-2.5-pro", "gemini-2.5-flash"],
+                    thinking=True,
+                )
                 answer = self._clean_mcq(answer)
                 if hasattr(self, '_overlay') and self._overlay:
                     self._overlay.set_answer(answer)
@@ -118,8 +133,24 @@ class MCQAgent(BaseAgent):
 
     @staticmethod
     def _clean_mcq(answer: str) -> str:
-        valid = re.findall(r'[A-Ga-g,| ]', answer)
-        if valid:
-            return "".join(valid).upper().strip()
-        m = re.search(r'[a-zA-Z]', answer)
-        return m.group(0).upper() if m else "?"
+        answer = answer.strip().upper()
+
+        # Scan from the bottom — Gemini 2.5 puts its actual answer last after thinking.
+        # Accept any line that is ONLY letters A-G with commas and pipes.
+        for line in reversed(answer.splitlines()):
+            line = line.strip()
+            if re.match(r'^[A-G]([,|][A-G])*$', line):
+                return line
+
+        # Look for first standalone clean pattern: A  or  A,C  or  B|A,C
+        m = re.search(r'\b([A-G](?:[,|][A-G])*)\b', answer)
+        if m:
+            return m.group(1)
+
+        # Last resort: first letter A-G that stands alone
+        m = re.search(r'\b([A-G])\b', answer)
+        if m:
+            return m.group(1)
+
+        m = re.search(r'[A-G]', answer)
+        return m.group(0) if m else "?"

@@ -1,7 +1,6 @@
 """
 src/ui/launcher.py
-Main launcher window — dark sidebar layout.
-Left panel: agent cards. Right panel: description + hotkeys + settings toggle.
+Main launcher window. Cross-platform (Windows / Linux / macOS).
 """
 from __future__ import annotations
 
@@ -9,20 +8,37 @@ import os
 import sys
 import threading
 import tkinter as tk
+from tkinter import font as tkfont
 from typing import Optional
-
-def resource_path(relative_path: str) -> str:
-    """Get absolute path to resource, works for dev and for PyInstaller"""
-    try:
-        base_path = sys._MEIPASS
-    except Exception:
-        # Assume we are run from the project root in dev mode
-        base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-    return os.path.join(base_path, relative_path)
-
 
 from src.core.config import Config, save_config
 from src.core.hotkey_manager import HotkeyManager
+
+
+def _resource(relative_path: str) -> str:
+    try:
+        base = sys._MEIPASS
+    except AttributeError:
+        base = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    return os.path.join(base, relative_path)
+
+
+def _pick_sans() -> str:
+    families = tkfont.families()
+    for name in ("Segoe UI", "Ubuntu", "DejaVu Sans", "Liberation Sans", "Helvetica"):
+        if name in families:
+            return name
+    return "TkDefaultFont"
+
+
+def _pick_mono() -> str:
+    families = tkfont.families()
+    for name in ("Cascadia Code", "JetBrains Mono", "DejaVu Sans Mono",
+                 "Liberation Mono", "Consolas", "Courier New"):
+        if name in families:
+            return name
+    return "TkFixedFont"
+
 
 BG      = "#07070f"
 SIDEBAR = "#0e0e1a"
@@ -37,18 +53,16 @@ RED     = "#ff5566"
 
 
 class AgentCard:
-    """Represents one clickable agent card in the sidebar."""
-
-    def __init__(self, parent, name: str, emoji: str, description: str, on_click):
+    def __init__(self, parent, name: str, emoji: str, description: str, on_click, sans: str):
         self.frame = tk.Frame(parent, bg=CARD_BG, cursor="hand2", padx=12, pady=10)
         self.frame.pack(fill="x", padx=8, pady=4)
 
         self.name_lbl = tk.Label(self.frame, text=f"{emoji}  {name}", bg=CARD_BG,
-                                 fg=FG, font=("Segoe UI", 11, "bold"), anchor="w")
+                                 fg=FG, font=(sans, 11, "bold"), anchor="w")
         self.name_lbl.pack(fill="x")
 
         self.desc_lbl = tk.Label(self.frame, text=description, bg=CARD_BG,
-                                 fg=FG2, font=("Segoe UI", 9), wraplength=200, anchor="w")
+                                 fg=FG2, font=(sans, 9), wraplength=200, anchor="w")
         self.desc_lbl.pack(fill="x")
 
         for w in (self.frame, self.name_lbl, self.desc_lbl):
@@ -69,19 +83,12 @@ class AgentCard:
 
 
 class LauncherWindow:
-    """
-    Main application window.
-    Sidebar (left) lists all agents.
-    Detail panel (right) shows hotkeys, launch/stop, and settings.
-    """
-
     AGENTS = [
-        ("clipboard",   "📋", "Clipboard Copy"),
-        ("autotype",    "⌨️",  "Auto-Type"),
-        ("general",     "🧠", "General AI"),
-        ("mcq",         "🎯", "MCQ AI"),
-        # Full Control now includes real-time transcript + auto-mode
-        ("full_control","👑", "Full Control"),
+        ("clipboard",    "C", "Clipboard Copy"),
+        ("autotype",     "T", "Auto-Type"),
+        ("general",      "G", "General AI"),
+        ("mcq",          "M", "MCQ AI"),
+        ("full_control", "F", "Full Control"),
     ]
 
     def __init__(self, cfg: Config):
@@ -93,9 +100,10 @@ class LauncherWindow:
         self._show_settings   = False
         self._status_var      = None
         self._detail_frame    = None
-        self._settings_frame  = None
 
         self._root = tk.Tk()
+        self._sans = _pick_sans()
+        self._mono = _pick_mono()
         self._build()
 
     def run(self) -> None:
@@ -104,7 +112,6 @@ class LauncherWindow:
         self._root.mainloop()
 
     def _register_system_hotkeys(self) -> None:
-        """Register hotkeys that stay active regardless of the current agent."""
         h = self._cfg.hotkeys
         mapping = {
             h.switch_clipboard:    "clipboard",
@@ -115,10 +122,7 @@ class LauncherWindow:
         }
         for combo, agent_key in mapping.items():
             if combo:
-                # Use a closure for agent_key
                 self._hotkeys.register(combo, lambda k=agent_key: self._root.after(0, self._launch, k))
-
-    # ── Build UI ──────────────────────────────────────────────────────────────
 
     def _build(self) -> None:
         r = self._root
@@ -126,14 +130,19 @@ class LauncherWindow:
         r.configure(bg=BG)
         r.geometry("820x580")
         r.resizable(False, False)
-        r.protocol("WM_DELETE_WINDOW", self._on_close)
+        r.protocol("WM_DELETE_WINDOW", self._quit_app)
 
-        try:
-            r.iconbitmap(default=resource_path("logo.ico"))
-        except Exception as e:
-            print(f"Warning: Could not load icon ({e})")
+        # Try to set icon (PNG works cross-platform; .ico is Windows-only)
+        for icon_name in ("logo.png", "logo.ico"):
+            try:
+                from PIL import Image, ImageTk
+                img = Image.open(_resource(icon_name)).resize((32, 32))
+                photo = ImageTk.PhotoImage(img)
+                r.iconphoto(True, photo)
+                break
+            except Exception:
+                continue
 
-        # ── Main layout: sidebar + detail ─────────────────────────────────────
         sidebar_outer = tk.Frame(r, bg=SIDEBAR, width=240)
         sidebar_outer.pack(side="left", fill="y")
         sidebar_outer.pack_propagate(False)
@@ -141,57 +150,36 @@ class LauncherWindow:
         self._detail_frame = tk.Frame(r, bg=BG)
         self._detail_frame.pack(side="right", fill="both", expand=True)
 
-        # Sidebar header (Fixed at top)
-        tk.Label(sidebar_outer, text="✦ Helfi", bg=SIDEBAR, fg=ACC,
-                 font=("Segoe UI", 13, "bold")).pack(pady=(20, 4), padx=12, anchor="w")
+        tk.Label(sidebar_outer, text="Helfi", bg=SIDEBAR, fg=ACC,
+                 font=(self._sans, 13, "bold")).pack(pady=(20, 4), padx=12, anchor="w")
         tk.Label(sidebar_outer, text="AI Toolkit v2.0", bg=SIDEBAR, fg=FG2,
-                 font=("Segoe UI", 9)).pack(padx=12, anchor="w")
+                 font=(self._sans, 9)).pack(padx=12, anchor="w")
         tk.Frame(sidebar_outer, bg="#1a1a30", height=1).pack(fill="x", pady=12, padx=8)
 
-        # Settings toggle (Fixed at bottom)
         settings_frame = tk.Frame(sidebar_outer, bg=SIDEBAR)
         settings_frame.pack(side="bottom", fill="x", pady=(0, 12))
         tk.Frame(settings_frame, bg="#1a1a30", height=1).pack(fill="x", pady=(0, 12), padx=8)
-        settings_lbl = tk.Label(settings_frame, text="⚙  Settings", bg=SIDEBAR, fg=FG2,
-                                font=("Segoe UI", 10), cursor="hand2")
+        settings_lbl = tk.Label(settings_frame, text="Settings", bg=SIDEBAR, fg=FG2,
+                                font=(self._sans, 10), cursor="hand2")
         settings_lbl.pack(anchor="w", padx=16)
         settings_lbl.bind("<Button-1>", lambda e: self._toggle_settings())
         settings_lbl.bind("<Enter>", lambda e: settings_lbl.config(fg=ACC))
         settings_lbl.bind("<Leave>", lambda e: settings_lbl.config(fg=FG2))
 
-        # Scrollable middle section for Agent Cards
         canvas = tk.Canvas(sidebar_outer, bg=SIDEBAR, highlightthickness=0)
-        scrollbar = tk.Scrollbar(sidebar_outer, orient="vertical", command=canvas.yview, width=8)
-        
         sidebar_cards = tk.Frame(canvas, bg=SIDEBAR)
-        
-        sidebar_cards.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-        # Bind mousewheel to canvas
-        def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-            
-        canvas.bind_all("<MouseWheel>", _on_mousewheel)
-
+        sidebar_cards.bind("<Configure>",
+                           lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
         canvas.create_window((0, 0), window=sidebar_cards, anchor="nw", width=230)
-        canvas.configure(yscrollcommand=scrollbar.set)
-        
         canvas.pack(side="left", fill="both", expand=True)
-        # We only pack scrollbar if the list is getting too long to look clean, 
-        # but leaving it packed on the right works.
-        # scrollbar.pack(side="right", fill="y")
 
-        # Agent cards (inside scrollable frame)
         for key, emoji, name in self.AGENTS:
             agent = self._get_agent(key)
             desc  = agent.get_description() if agent else ""
             card  = AgentCard(sidebar_cards, name, emoji, desc,
-                              on_click=lambda k=key: self._select(k))
+                              on_click=lambda k=key: self._select(k), sans=self._sans)
             self._cards[key] = card
 
-        # Initial view
         if not self._cfg.api_key:
             self._toggle_settings()
         else:
@@ -200,22 +188,19 @@ class LauncherWindow:
     def _show_welcome(self) -> None:
         self._clear_detail()
         f = self._detail_frame
-        tk.Label(f, text="✦", bg=BG, fg=ACC, font=("Segoe UI", 40)).pack(pady=(60, 4))
         tk.Label(f, text="Helfi AI Toolkit", bg=BG, fg=FG,
-                 font=("Segoe UI", 18, "bold")).pack()
+                 font=(self._sans, 18, "bold")).pack(pady=(80, 4))
         tk.Label(f, text="Select a feature from the sidebar to get started.",
-                 bg=BG, fg=FG2, font=("Segoe UI", 11)).pack(pady=(8, 0))
-        
-        # New: Global Hotkeys Hint
+                 bg=BG, fg=FG2, font=(self._sans, 11)).pack(pady=(8, 0))
+
         hint_frame = tk.Frame(f, bg=CARD_BG, padx=20, pady=15)
         hint_frame.pack(pady=40)
         tk.Label(hint_frame, text="Quick Mode Switch (Global)", bg=CARD_BG, fg=ACC,
-                 font=("Segoe UI", 10, "bold")).pack(anchor="w")
-        
+                 font=(self._sans, 10, "bold")).pack(anchor="w")
+
         h = self._cfg.hotkeys
         grid = tk.Frame(hint_frame, bg=CARD_BG)
         grid.pack(pady=(8, 0))
-        
         tips = [
             (h.switch_clipboard, "To Clipboard"),
             (h.switch_autotype,  "To Auto-Type"),
@@ -225,8 +210,10 @@ class LauncherWindow:
         ]
         for i, (hk, label) in enumerate(tips):
             r, c = divmod(i, 2)
-            tk.Label(grid, text=f"{hk} : ", bg=CARD_BG, fg=FG2, font=("Cascadia Code", 9)).grid(row=r, column=c*2, sticky="e", pady=2)
-            tk.Label(grid, text=label, bg=CARD_BG, fg=FG, font=("Segoe UI", 9)).grid(row=r, column=c*2+1, sticky="w", padx=(0, 20))
+            tk.Label(grid, text=f"{hk} : ", bg=CARD_BG, fg=FG2,
+                     font=(self._mono, 9)).grid(row=r, column=c*2, sticky="e", pady=2)
+            tk.Label(grid, text=label, bg=CARD_BG, fg=FG,
+                     font=(self._sans, 9)).grid(row=r, column=c*2+1, sticky="w", padx=(0, 20))
 
     def _select(self, key: str) -> None:
         if self._selected_key == key:
@@ -245,85 +232,73 @@ class LauncherWindow:
             return
         f = self._detail_frame
 
-        # Title row
         title_row = tk.Frame(f, bg=BG)
         title_row.pack(fill="x", padx=24, pady=(24, 4))
 
         _, emoji, name = next(x for x in self.AGENTS if x[0] == key)
         tk.Label(title_row, text=f"{emoji}  {name}", bg=BG, fg=FG,
-                 font=("Segoe UI", 16, "bold")).pack(side="left")
+                 font=(self._sans, 16, "bold")).pack(side="left")
 
-        # Status
         self._status_var = tk.StringVar(value="● Stopped")
         self._status_lbl = tk.Label(title_row, textvariable=self._status_var,
-                                    bg=BG, fg=RED, font=("Segoe UI", 10, "bold"))
+                                    bg=BG, fg=RED, font=(self._sans, 10, "bold"))
         self._status_lbl.pack(side="right")
 
-        # Description
         tk.Label(f, text=agent.get_description(), bg=BG, fg=FG2,
-                 font=("Segoe UI", 10), wraplength=520, anchor="w").pack(
+                 font=(self._sans, 10), wraplength=520, anchor="w").pack(
             fill="x", padx=24, pady=(0, 12))
 
         tk.Frame(f, bg="#1a1a30", height=1).pack(fill="x", padx=24, pady=(0, 16))
 
-        # Hotkey table
         hk_frame = tk.Frame(f, bg=BG)
         hk_frame.pack(fill="x", padx=24)
         tk.Label(hk_frame, text="Hotkeys", bg=BG, fg=ACC,
-                 font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(0, 6))
+                 font=(self._sans, 10, "bold")).pack(anchor="w", pady=(0, 6))
 
         for hk in agent.get_default_hotkeys():
             row = tk.Frame(hk_frame, bg=CARD_BG, padx=10, pady=6)
             row.pack(fill="x", pady=2)
             tk.Label(row, text=hk.combo, bg=CARD_BG, fg=ACC,
-                     font=("Cascadia Code", 10) if True else ("Consolas", 10),
-                     width=12, anchor="w").pack(side="left")
+                     font=(self._mono, 10), width=12, anchor="w").pack(side="left")
             tk.Label(row, text=hk.description, bg=CARD_BG, fg=FG,
-                     font=("Segoe UI", 10), anchor="w").pack(side="left")
+                     font=(self._sans, 10), anchor="w").pack(side="left")
 
-        # Optional Toggle for Multi-File (Auto-Type only)
         if key == "autotype":
             toggle_row = tk.Frame(f, bg=BG)
             toggle_row.pack(fill="x", padx=24, pady=(16, 0))
-            
             self._mf_var = tk.BooleanVar(value=self._cfg.typing.multifile_mode)
+
             def _on_mf_toggle():
                 self._cfg.typing.multifile_mode = self._mf_var.get()
                 save_config(self._cfg)
-                # Refresh hotkeys if needed, or just update UI labels?
-                # For now just refreshing description/hotkeys in place is complex, 
-                # but we'll reload the detail view to show new hotkeys if they differ.
                 self._show_agent_detail("autotype")
 
             mf_cb = tk.Checkbutton(
                 toggle_row, text="Multi-File Mode (LLD)", variable=self._mf_var,
                 command=_on_mf_toggle, bg=BG, fg=ACC, activebackground=BG,
                 activeforeground=ACC2, selectcolor=CARD_BG,
-                font=("Segoe UI", 10, "bold"), bd=0, highlightthickness=0
+                font=(self._sans, 10, "bold"), bd=0, highlightthickness=0
             )
             mf_cb.pack(side="left")
-            
             tk.Label(toggle_row, text="(Enables k+n for next file)", bg=BG, fg=FG2,
-                     font=("Segoe UI", 9)).pack(side="left", padx=8)
+                     font=(self._sans, 9)).pack(side="left", padx=8)
 
-        # Launch / Stop buttons
         btn_row = tk.Frame(f, bg=BG)
         btn_row.pack(pady=24)
 
-        self._launch_btn = tk.Label(btn_row, text="  ▶  Launch  ", bg=GREEN, fg="#fff",
-                                    font=("Segoe UI", 11, "bold"), cursor="hand2", pady=8, padx=16)
+        self._launch_btn = tk.Label(btn_row, text="  Launch  ", bg=GREEN, fg="#fff",
+                                    font=(self._sans, 11, "bold"), cursor="hand2", pady=8, padx=16)
         self._launch_btn.pack(side="left", padx=8)
         self._launch_btn.bind("<Button-1>", lambda e: self._launch(key))
         self._launch_btn.bind("<Enter>", lambda e: self._launch_btn.config(bg="#48c88a"))
         self._launch_btn.bind("<Leave>", lambda e: self._launch_btn.config(bg=GREEN))
 
-        # API Key Warning
         if not self._cfg.api_key:
-            tk.Label(f, text="⚠️ API Key Missing! Go to Settings to setup.", bg=BG, fg=RED,
-                     font=("Segoe UI", 9, "bold")).pack(pady=(0, 10))
+            tk.Label(f, text="API Key Missing — go to Settings.", bg=BG, fg=RED,
+                     font=(self._sans, 9, "bold")).pack(pady=(0, 10))
 
-        stop_btn = tk.Label(btn_row, text="  ■  Stop  ", bg=RED, fg="#fff",
-                            font=("Segoe UI", 11, "bold"), cursor="hand2", pady=8, padx=16)
+        stop_btn = tk.Label(btn_row, text="  Stop  ", bg=RED, fg="#fff",
+                            font=(self._sans, 11, "bold"), cursor="hand2", pady=8, padx=16)
         stop_btn.pack(side="left", padx=8)
         stop_btn.bind("<Button-1>", lambda e: self._stop_agent())
         stop_btn.bind("<Enter>", lambda e: stop_btn.config(bg="#ff7788"))
@@ -345,18 +320,16 @@ class LauncherWindow:
 
     def _on_settings_saved(self, cfg: Config) -> None:
         self._cfg = cfg
-        # Re-wire hotkeys if an agent is active
         if self._active_agent:
             self._hotkeys.clear()
             self._register_system_hotkeys()
             self._active_agent._register_hotkeys()
 
-    # ── Agent lifecycle ───────────────────────────────────────────────────────
-
     def _launch(self, key: str) -> None:
         if not self._cfg.api_key:
             from tkinter import messagebox
-            messagebox.showwarning("API Key Required", "Please enter your Gemini API Key in the Settings panel before launching an agent.")
+            messagebox.showwarning("API Key Required",
+                                   "Please enter your Gemini API Key in Settings before launching.")
             self._toggle_settings()
             return
 
@@ -368,7 +341,7 @@ class LauncherWindow:
             return
 
         self._hotkeys.clear()
-        self._register_system_hotkeys()  # Always keep switcher hotkeys active
+        self._register_system_hotkeys()
         self._active_agent = agent
 
         def _run():
@@ -376,7 +349,7 @@ class LauncherWindow:
                 agent.start(self._cfg, self._hotkeys)
                 self._set_status("● Running", GREEN)
             except Exception as e:
-                print(f"❌  Agent error: {e}", flush=True)
+                print(f"Agent error: {e}", flush=True)
                 self._set_status("● Error", RED)
                 self._active_agent = None
 
@@ -396,8 +369,6 @@ class LauncherWindow:
                 self._status_var.set(text),
                 self._status_lbl.config(fg=color)
             ))
-
-    # ── Helpers ───────────────────────────────────────────────────────────────
 
     def _clear_detail(self) -> None:
         for w in self._detail_frame.winfo_children():
@@ -424,44 +395,6 @@ class LauncherWindow:
             agent_class = MultiFileAgent
 
         return agent_class() if agent_class else None
-
-    def _on_close(self) -> None:
-        # Hide the window to system tray
-        self._root.withdraw()
-        threading.Thread(target=self._create_tray_icon, daemon=True).start()
-
-    def _create_tray_icon(self) -> None:
-        try:
-            import pystray
-            from PIL import Image
-
-            try:
-                image = Image.open(resource_path("logo.png"))
-            except Exception:
-                from PIL import ImageDraw
-                image = Image.new('RGB', (64, 64), color=(124, 106, 247))
-                d = ImageDraw.Draw(image)
-                d.text((16, 24), "HF", fill=(255, 255, 255))
-
-            def on_show(icon, item):
-                icon.stop()
-                self._root.after(0, self._root.deiconify)
-
-            def on_exit(icon, item):
-                icon.stop()
-                self._root.after(0, self._quit_app)
-
-            menu = pystray.Menu(
-                pystray.MenuItem("Show Helfi", on_show, default=True),
-                pystray.MenuItem('Exit completely', on_exit)
-            )
-
-            icon = pystray.Icon("Helfi", image, "Helfi AI Toolkit", menu)
-            # This blocks the thread, which is fine since we are in a daemon thread.
-            icon.run()
-        except ImportError:
-            # Fallback if pystray not installed for some reason
-            self._quit_app()
 
     def _quit_app(self) -> None:
         self._stop_agent()
