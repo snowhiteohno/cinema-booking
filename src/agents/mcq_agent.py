@@ -102,7 +102,7 @@ class MCQAgent(BaseAgent):
                     self._overlay.set_thinking()
                 answer = self._gemini.generate(
                     [PROMPT] + imgs,
-                    models=["gemini-2.5-pro", "gemini-2.5-flash"],
+                    models=["gemini-3.1-pro", "gemini-3-pro", "gemini-2.5-pro", "gemini-2.5-flash"],
                     thinking=True,
                 )
                 answer = self._clean_mcq(answer)

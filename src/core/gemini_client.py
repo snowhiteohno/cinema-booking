@@ -32,6 +32,30 @@ class GeminiClient:
     def __init__(self, api_key: str, models: List[str]):
         self._client = genai.Client(api_key=api_key)
         self.models  = models
+        self._dead_models: set[str] = set()
+        self._preferred: Optional[str] = None
+
+    @staticmethod
+    def _is_permanent_failure(err: Exception) -> bool:
+        """A 404 / NOT_FOUND / unsupported-model error means this model ID
+        will never work — blacklist it instead of retrying every call."""
+        msg = str(err).lower()
+        return (
+            "404" in msg
+            or "not found" in msg
+            or "is not found" in msg
+            or "not supported" in msg
+            or "unknown model" in msg
+            or "invalid model" in msg
+        )
+
+    def _ordered_models(self, model_list: List[str]) -> List[str]:
+        """Filter out dead models and float the last-known-good to the front."""
+        live = [m for m in model_list if m not in self._dead_models]
+        if self._preferred and self._preferred in live:
+            live.remove(self._preferred)
+            live.insert(0, self._preferred)
+        return live
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -44,7 +68,7 @@ class GeminiClient:
         Returns the text response.
         Raises RuntimeError if all models fail.
         """
-        model_list = models or self.models
+        model_list = self._ordered_models(models or self.models)
         last_error = None
         config = None
         if thinking:
@@ -60,9 +84,14 @@ class GeminiClient:
                 response = self._client.models.generate_content(**kwargs)
                 text = response.text.strip()
                 print(f"logs: ✅ {model} responded.", flush=True)
+                self._preferred = model
                 return text
             except Exception as e:
-                print(f"logs: ⚠️  {model} failed — {e}", flush=True)
+                if self._is_permanent_failure(e):
+                    print(f"logs: ⛔ {model} unavailable — blacklisted for session.", flush=True)
+                    self._dead_models.add(model)
+                else:
+                    print(f"logs: ⚠️  {model} failed — {e}", flush=True)
                 last_error = e
         raise RuntimeError(f"All Gemini models failed. Last: {last_error}")
 
@@ -74,7 +103,7 @@ class GeminiClient:
         Returns transcribed string or None on failure.
         """
         wav_bytes  = self._to_wav(audio_data, sample_rate)
-        model_list = models or self.models
+        model_list = self._ordered_models(models or self.models)
         last_error = None
         for model in model_list:
             try:
@@ -88,9 +117,14 @@ class GeminiClient:
                     ]
                 )
                 text = response.text.strip()
+                self._preferred = model
                 return text if text else None
             except Exception as e:
-                print(f"logs: ⚠️  Transcribe {model} failed — {e}", flush=True)
+                if self._is_permanent_failure(e):
+                    print(f"logs: ⛔ Transcribe {model} unavailable — blacklisted for session.", flush=True)
+                    self._dead_models.add(model)
+                else:
+                    print(f"logs: ⚠️  Transcribe {model} failed — {e}", flush=True)
                 last_error = e
 
         print(f"❌  All transcription models failed: {last_error}", flush=True)

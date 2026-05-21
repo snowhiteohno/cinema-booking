@@ -31,6 +31,10 @@ if sys.platform == "win32":
             self._kb.type(ch)
             time.sleep(delay)
 
+        def type_string(self, s: str) -> None:
+            """Inject a whole string in one pynput call (no per-char delay)."""
+            self._kb.type(s)
+
         _KEY_MAP = {
             'enter':     'enter',
             'home':      'home',
@@ -137,6 +141,10 @@ else:
             self._ui.write(e.EV_KEY, keycode, 0); self._ui.syn()
             if shift:
                 self._ui.write(e.EV_KEY, e.KEY_LEFTSHIFT, 0); self._ui.syn()
+
+        def type_string(self, s: str) -> None:
+            for ch in s:
+                self.type_char(ch, delay=0)
 
         def press_key(self, key_name: str, shift: bool = False, delay: float = 0.02) -> None:
             keycode = _STR_TO_EVDEV.get(str(key_name))

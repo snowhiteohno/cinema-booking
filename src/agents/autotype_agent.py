@@ -135,21 +135,30 @@ class AutoTypeAgent(BaseAgent):
         self._is_typing  = True
         self._is_stopped = False
         t = self._config.typing
+        instant = t.delay_min == 0 and t.delay_max == 0
 
         lines = answer.splitlines()
         for i, line in enumerate(lines):
-            for char in line:
-                if not self._wait_if_paused():
-                    self._is_typing = False
-                    return
-                self._kb.type_char(char, delay=random.uniform(t.delay_min, t.delay_max))
+            if not self._wait_if_paused():
+                self._is_typing = False
+                return
+
+            if instant and line:
+                self._kb.type_string(line)
+            else:
+                for char in line:
+                    if not self._wait_if_paused():
+                        self._is_typing = False
+                        return
+                    self._kb.type_char(char, delay=random.uniform(t.delay_min, t.delay_max))
 
             if i < len(lines) - 1:
                 if not self._wait_if_paused():
                     self._is_typing = False
                     return
                 self._kb.press_key('enter')
-                time.sleep(0.05)
+                if not instant:
+                    time.sleep(0.05)
                 self._clear_auto_indent()
 
         self._is_typing = False

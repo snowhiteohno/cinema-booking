@@ -7,24 +7,25 @@ if not exist venv (
 set AGENT=%~1
 if "%AGENT%"=="" (
     echo.
-    echo Usage:  start.bat ^<agent^>
+    echo Opening Helfi launcher. Press Ctrl+C in this window to stop.
     echo.
-    echo   start.bat mcq          MCQ solver
-    echo   start.bat autotype     Types code into the editor
-    echo   start.bat combo        MCQ + AutoType together ^(f+g to switch^)
-    echo   start.bat general      General Q^&A
-    echo   start.bat clipboard    Copies answer to clipboard
+    echo   Headless agents:
+    echo     start.bat mcq          MCQ solver
+    echo     start.bat autotype     Types code into the editor
+    echo     start.bat combo        MCQ + AutoType together ^(f+g to switch^)
+    echo     start.bat general      General Q^&A
+    echo     start.bat clipboard    Copies answer to clipboard
+    echo     start.bat multifile    Multi-file LLD code generation
+    echo     start.bat full_control Unified assistant ^(screenshots + chat + audio^)
     echo.
-    echo Hotkeys ^(default^):
-    echo   k+,   Screenshot
-    echo   k+.   Send to Gemini
-    echo   k+/   Clear queue
-    echo   a+s   Pause / resume typing
-    echo   k+x   Stop typing
-    echo   m+n   Toggle overlay
-    echo   f+g   Switch MCQ / AutoType ^(combo mode^)
+    echo   Hotkeys ^(default^):
+    echo     k+,   Screenshot         k+.   Send to Gemini
+    echo     k+/   Clear queue        a+s   Pause / resume typing
+    echo     k+x   Stop typing        m+n   Toggle overlay
+    echo     f+g   Switch MCQ / AutoType ^(combo mode^)
     echo.
-    exit /b 0
+    venv\Scripts\python main.py
+    exit /b %ERRORLEVEL%
 )
 
 echo.

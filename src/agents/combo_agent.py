@@ -42,7 +42,7 @@ class ComboAgent(BaseAgent):
         self._hotkeys.register(hk.add_screenshot, self._add)
         self._hotkeys.register(hk.send,           self._send)
         self._hotkeys.register(hk.clear_queue,    self._clear)
-        self._hotkeys.register("f+g",             self._toggle_mode)
+        self._hotkeys.register("0+t",             self._toggle_mode)
         self._hotkeys.register(hk.toggle_overlay, self._mcq._toggle_overlay)
         self._hotkeys.register(hk.pause_typing,   self._at._toggle_pause)
         self._hotkeys.register(hk.stop_typing,    self._at._stop)
